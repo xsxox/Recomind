@@ -31,7 +31,11 @@ CREATE TABLE IF NOT EXISTS movies (
     release_year INT          DEFAULT NULL       COMMENT '上映年份',
     description  TEXT                            COMMENT '剧情简介（用于NLP特征提取）',
     poster_color VARCHAR(20)  DEFAULT '#4A90D9'  COMMENT '海报占位颜色',
-    poster_url   VARCHAR(500) DEFAULT NULL       COMMENT '在线海报地址'
+    poster_url   VARCHAR(500) DEFAULT NULL       COMMENT '在线海报地址',
+    tmdb_id      INT          DEFAULT NULL       COMMENT 'TMDB 电影ID',
+    vote_average DOUBLE       DEFAULT 0          COMMENT 'TMDB 平均评分',
+    vote_count   INT          DEFAULT 0          COMMENT 'TMDB 评分人数',
+    UNIQUE KEY uk_tmdb_id (tmdb_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='电影表';
 """
 
@@ -60,12 +64,25 @@ CREATE TABLE IF NOT EXISTS browse_history (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='浏览历史表';
 """
 
+CREATE_REVIEWS_TABLE = """
+CREATE TABLE IF NOT EXISTS reviews (
+    id         INT AUTO_INCREMENT PRIMARY KEY COMMENT '影评ID',
+    movie_id   INT NOT NULL                   COMMENT '电影ID',
+    author     VARCHAR(100) DEFAULT NULL      COMMENT '作者',
+    content    TEXT                           COMMENT '影评内容',
+    rating     DOUBLE DEFAULT NULL            COMMENT '作者评分',
+    created_at VARCHAR(50) DEFAULT NULL       COMMENT '发布时间',
+    CONSTRAINT fk_review_movie FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='影评表';
+"""
+
 # 按依赖顺序组织，供初始化脚本依次执行
 ALL_TABLES_SQL = [
     CREATE_USERS_TABLE,
     CREATE_MOVIES_TABLE,
     CREATE_RATINGS_TABLE,
     CREATE_HISTORY_TABLE,
+    CREATE_REVIEWS_TABLE,
 ]
 
 
@@ -107,6 +124,9 @@ class Movie:
     description: str = ""
     poster_color: str = "#4A90D9"
     poster_url: str = ""
+    tmdb_id: int = 0
+    vote_average: float = 0.0
+    vote_count: int = 0
 
     @classmethod
     def from_dict(cls, row: dict) -> "Movie":
@@ -120,6 +140,9 @@ class Movie:
             description=row.get("description") or "",
             poster_color=row.get("poster_color") or "#4A90D9",
             poster_url=row.get("poster_url") or "",
+            tmdb_id=row.get("tmdb_id") or 0,
+            vote_average=float(row.get("vote_average") or 0),
+            vote_count=int(row.get("vote_count") or 0),
         )
 
     def text(self) -> str:
@@ -146,4 +169,26 @@ class Rating:
             score=row.get("score", 0),
             comment=row.get("comment") or "",
             rating_time=row.get("rating_time") or datetime.now(),
+        )
+
+
+@dataclass
+class Review:
+    """影评实体（来自 TMDB）。"""
+    id: int = 0
+    movie_id: int = 0
+    author: str = ""
+    content: str = ""
+    rating: float = 0.0
+    created_at: str = ""
+
+    @classmethod
+    def from_dict(cls, row: dict) -> "Review":
+        return cls(
+            id=row.get("id", 0),
+            movie_id=row.get("movie_id", 0),
+            author=row.get("author") or "匿名",
+            content=row.get("content") or "",
+            rating=float(row.get("rating") or 0),
+            created_at=row.get("created_at") or "",
         )

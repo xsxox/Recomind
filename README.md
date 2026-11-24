@@ -124,16 +124,26 @@ python main.py
 
 首次启动会自动：建库建表 → 导入示例数据 → 弹出登录窗口。
 
-### 4. 接入真实电影海报（TMDB，可选）
+### 4. 拉取 TMDB 真实片库与海报（推荐）
 
-电影卡片默认显示程序生成的渐变海报。如需 TMDB 真实海报：
+电影数据默认来自 `data/sample_data.py` 的离线示例。接入 TMDB 后可获得真实片库、导演、类型、简介、评分与影评：
 
 1. 在 https://www.themoviedb.org/settings/api 免费申请 API Key（v3）；
 2. 打开 `config.py`，把 Key 填入 `TMDB_API_KEY`；
-3. 执行 `python -m scripts.fetch_posters` 抓取全部海报。
+3. 拉取真实片库（会重建电影数据并生成演示评分）：
 
-抓取结果会写入 `movies.poster_url`，程序会异步加载并缓存到 `data/posters/`；
-无网络或未配置 Key 时自动回落到生成的渐变海报。
+   ```bash
+   python -m scripts.fetch_movies --pages 3
+   ```
+
+4. 如需单独补充/更新海报：
+
+   ```bash
+   python -m scripts.fetch_posters --force
+   ```
+
+采集内容：高分榜 + 热门榜的真实电影（自动过滤冷门/未上映）、导演、制片公司、类型、简介、海报、TMDB 评分与评分人数、真实影评；
+同时为演示用户生成模拟评分用于协同过滤。无网络或未配置 Key 时，程序仍可用离线示例数据运行。
 
 ## 六、使用说明
 

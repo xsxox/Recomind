@@ -102,9 +102,7 @@ class DetailDialog(QDialog):
         meta_row.addStretch()
         info.addLayout(meta_row)
 
-        avg, cnt = self.main.rating_service.get_movie_avg_score(movie.id)
-        rating_text = f"综合评分 {avg} 分  ·  {cnt} 人评价" if cnt else "暂无评价，欢迎写下你的第一条影评"
-        self.avg_label = QLabel(rating_text)
+        self.avg_label = QLabel(self._rating_text(movie))
         self.avg_label.setStyleSheet(
             "background-color: #FEF3C7; color: #B45309; border-radius: 8px;"
             "padding: 7px 14px; font-size: 14px; font-weight: bold;"
@@ -154,6 +152,30 @@ class DetailDialog(QDialog):
         rate_layout.addLayout(rate_row)
         body.addWidget(rate_panel)
 
+        reviews = self.main.movie_service.list_reviews(movie.id, limit=4)
+        if reviews:
+            rv_title = QLabel("真实影评 · 来自 TMDB")
+            rv_title.setObjectName("sectionTitle")
+            body.addWidget(rv_title)
+            for review in reviews:
+                card = QFrame()
+                card.setObjectName("panel")
+                card_layout = QVBoxLayout(card)
+                card_layout.setContentsMargins(18, 14, 18, 14)
+                card_layout.setSpacing(6)
+                if review.rating:
+                    head_text = f"{review.author}　★ {review.rating:.0f}"
+                else:
+                    head_text = review.author
+                head = QLabel(head_text)
+                head.setStyleSheet("color: #B45309; font-weight: bold; font-size: 13px;")
+                content = QLabel(review.content)
+                content.setWordWrap(True)
+                content.setStyleSheet("color: #4B5563; font-size: 13px;")
+                card_layout.addWidget(head)
+                card_layout.addWidget(content)
+                body.addWidget(card)
+
         sim_title = QLabel("相似电影推荐 · 基于 NLP 内容语义计算")
         sim_title.setObjectName("sectionTitle")
         body.addWidget(sim_title)
@@ -172,6 +194,16 @@ class DetailDialog(QDialog):
                 self.comment_edit.setPlainText(rating.comment or "")
 
         self._load_similar()
+
+    def _rating_text(self, movie):
+        """组合展示 TMDB 真实评分与本站评分。"""
+        parts = []
+        if movie.vote_count and movie.vote_average:
+            parts.append(f"TMDB {movie.vote_average:.1f} · {movie.vote_count} 人评分")
+        avg, cnt = self.main.rating_service.get_movie_avg_score(movie.id)
+        if cnt:
+            parts.append(f"本站 {avg} 分 · {cnt} 人")
+        return "　|　".join(parts) if parts else "暂无评分，欢迎写下第一条影评"
 
     def _load_similar(self):
         try:
@@ -206,5 +238,4 @@ class DetailDialog(QDialog):
             QMessageBox.critical(self, "错误", f"评分提交失败：{exc}")
             return
         QMessageBox.information(self, "成功", "评分已提交")
-        avg, cnt = self.main.rating_service.get_movie_avg_score(self.movie.id)
-        self.avg_label.setText(f"综合评分 {avg} 分  ·  {cnt} 人评价")
+        self.avg_label.setText(self._rating_text(self.movie))

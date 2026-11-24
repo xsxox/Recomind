@@ -61,6 +61,36 @@ def create_tables():
         conn.close()
 
 
+def _column_exists(table, column):
+    rows = execute_query(
+        "SELECT COUNT(*) AS c FROM information_schema.COLUMNS "
+        "WHERE TABLE_SCHEMA=%s AND TABLE_NAME=%s AND COLUMN_NAME=%s",
+        (config.DB_CONFIG["database"], table, column),
+    )
+    return bool(rows and rows[0]["c"])
+
+
+def ensure_movie_columns():
+    """为旧版 movies 表补充 TMDB 字段（幂等）。"""
+    if not _column_exists("movies", "tmdb_id"):
+        execute_update(
+            "ALTER TABLE movies ADD COLUMN tmdb_id INT DEFAULT NULL COMMENT 'TMDB 电影ID'"
+        )
+        try:
+            execute_update("ALTER TABLE movies ADD UNIQUE KEY uk_tmdb_id (tmdb_id)")
+        except Exception:  # noqa: BLE001
+            pass
+        logger.info("已为 movies 表添加 tmdb_id 字段")
+    if not _column_exists("movies", "vote_average"):
+        execute_update(
+            "ALTER TABLE movies ADD COLUMN vote_average DOUBLE DEFAULT 0 COMMENT 'TMDB 平均评分'"
+        )
+    if not _column_exists("movies", "vote_count"):
+        execute_update(
+            "ALTER TABLE movies ADD COLUMN vote_count INT DEFAULT 0 COMMENT 'TMDB 评分人数'"
+        )
+
+
 def ensure_poster_url_column():
     """为旧版 movies 表补充 poster_url 字段（幂等）。"""
     rows = execute_query(
@@ -82,6 +112,7 @@ def init_database():
     migrate_from_books()
     create_tables()
     ensure_poster_url_column()
+    ensure_movie_columns()
 
 
 if __name__ == "__main__":

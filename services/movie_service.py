@@ -56,6 +56,14 @@ class MovieService:
     def delete_movie(self, movie_id):
         return execute_update("DELETE FROM movies WHERE id=%s", (movie_id,))
 
+    def list_reviews(self, movie_id, limit=5):
+        """查询某部电影的真实影评。"""
+        rows = execute_query(
+            "SELECT * FROM reviews WHERE movie_id=%s ORDER BY id LIMIT %s",
+            (movie_id, limit),
+        )
+        return [models.Review.from_dict(r) for r in rows]
+
     def count_movies(self):
         rows = execute_query("SELECT COUNT(*) AS c FROM movies")
         return rows[0]["c"] if rows else 0
