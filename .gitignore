@@ -1,0 +1,20 @@
+# Python 字节码缓存
+__pycache__/
+*.py[cod]
+
+# 本地第三方依赖（可运行 pip install -r requirements.txt 重新生成）
+vendor/
+
+# 沙箱权限修复记录（本地工具产物，无需提交）
+.acl-recovery/
+
+# 运行日志
+recomind.log
+
+# 虚拟环境
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/

@@ -1,0 +1,8 @@
+# Recomind 智能推荐系统 - 依赖清单
+# 安装命令：pip install -r requirements.txt
+PyQt5>=5.15.0          # 桌面图形界面
+PyMySQL>=1.1.0         # MySQL 数据库驱动
+cryptography>=42.0.0   # MySQL 8 密码认证所需
+jieba>=0.42.1          # 中文分词
+scikit-learn>=1.4.0    # TF-IDF、余弦相似度等机器学习算法
+numpy>=1.26.0          # 数值计算
