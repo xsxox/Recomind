@@ -41,6 +41,21 @@ class RatingService:
         rows = execute_query("SELECT * FROM ratings WHERE user_id=%s ORDER BY rating_time DESC", (user_id,))
         return [models.Rating.from_dict(r) for r in rows]
 
+    def get_user_ratings_with_movies(self, user_id):
+        """返回用户的评分（联表电影信息），供个人中心展示。"""
+        rows = execute_query(
+            "SELECT r.id, r.movie_id, r.score, r.comment, r.rating_time, "
+            "m.title, m.genre, m.poster_color "
+            "FROM ratings r JOIN movies m ON r.movie_id = m.id "
+            "WHERE r.user_id=%s ORDER BY r.rating_time DESC, r.id DESC",
+            (user_id,),
+        )
+        return rows
+
+    def count_user_ratings(self, user_id):
+        rows = execute_query("SELECT COUNT(*) AS c FROM ratings WHERE user_id=%s", (user_id,))
+        return rows[0]["c"] if rows else 0
+
     def get_all_ratings(self):
         """返回全部评分（供协同过滤使用）。"""
         rows = execute_query("SELECT user_id, movie_id, score FROM ratings")

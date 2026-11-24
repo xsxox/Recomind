@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS movies (
     description  TEXT                            COMMENT '剧情简介（用于NLP特征提取）',
     poster_color VARCHAR(20)  DEFAULT '#4A90D9'  COMMENT '海报占位颜色',
     poster_url   VARCHAR(500) DEFAULT NULL       COMMENT '在线海报地址',
+    keywords     VARCHAR(500) DEFAULT NULL       COMMENT 'TMDB 关键词',
     tmdb_id      INT          DEFAULT NULL       COMMENT 'TMDB 电影ID',
     vote_average DOUBLE       DEFAULT 0          COMMENT 'TMDB 平均评分',
     vote_count   INT          DEFAULT 0          COMMENT 'TMDB 评分人数',
@@ -76,6 +77,18 @@ CREATE TABLE IF NOT EXISTS reviews (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='影评表';
 """
 
+CREATE_USER_SETTINGS_TABLE = """
+CREATE TABLE IF NOT EXISTS user_settings (
+    user_id          INT PRIMARY KEY COMMENT '用户ID',
+    preferred_genres VARCHAR(200) DEFAULT '' COMMENT '偏好类型（逗号分隔）',
+    recommend_top_n  INT DEFAULT 12 COMMENT '推荐条数',
+    enable_content   TINYINT DEFAULT 1 COMMENT '启用内容推荐',
+    enable_item_cf   TINYINT DEFAULT 1 COMMENT '启用物品协同过滤',
+    enable_user_cf   TINYINT DEFAULT 1 COMMENT '启用用户协同过滤',
+    CONSTRAINT fk_setting_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户设置表';
+"""
+
 # 按依赖顺序组织，供初始化脚本依次执行
 ALL_TABLES_SQL = [
     CREATE_USERS_TABLE,
@@ -83,6 +96,7 @@ ALL_TABLES_SQL = [
     CREATE_RATINGS_TABLE,
     CREATE_HISTORY_TABLE,
     CREATE_REVIEWS_TABLE,
+    CREATE_USER_SETTINGS_TABLE,
 ]
 
 
@@ -124,6 +138,7 @@ class Movie:
     description: str = ""
     poster_color: str = "#4A90D9"
     poster_url: str = ""
+    keywords: str = ""
     tmdb_id: int = 0
     vote_average: float = 0.0
     vote_count: int = 0
@@ -140,6 +155,7 @@ class Movie:
             description=row.get("description") or "",
             poster_color=row.get("poster_color") or "#4A90D9",
             poster_url=row.get("poster_url") or "",
+            keywords=row.get("keywords") or "",
             tmdb_id=row.get("tmdb_id") or 0,
             vote_average=float(row.get("vote_average") or 0),
             vote_count=int(row.get("vote_count") or 0),
@@ -147,7 +163,7 @@ class Movie:
 
     def text(self) -> str:
         """拼接用于 NLP 特征提取的文本。"""
-        return " ".join(filter(None, [self.title, self.director, self.genre, self.description]))
+        return " ".join(filter(None, [self.title, self.director, self.genre, self.keywords, self.description]))
 
 
 @dataclass

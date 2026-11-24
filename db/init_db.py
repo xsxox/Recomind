@@ -89,6 +89,10 @@ def ensure_movie_columns():
         execute_update(
             "ALTER TABLE movies ADD COLUMN vote_count INT DEFAULT 0 COMMENT 'TMDB 评分人数'"
         )
+    if not _column_exists("movies", "keywords"):
+        execute_update(
+            "ALTER TABLE movies ADD COLUMN keywords VARCHAR(500) DEFAULT NULL COMMENT 'TMDB 关键词'"
+        )
 
 
 def ensure_poster_url_column():

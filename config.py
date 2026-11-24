@@ -35,7 +35,13 @@ LOG_FILE = os.path.join(BASE_DIR, "recomind.log")
 CONTENT_TOP_N = 10            # 内容推荐返回条数
 COLLAB_TOP_N = 10             # 协同过滤推荐返回条数
 HYBRID_TOP_N = 12             # 混合推荐返回条数
-HYBRID_CONTENT_WEIGHT = 0.6   # 混合推荐中内容推荐的权重（剩余为协同过滤权重）
+HYBRID_CONTENT_WEIGHT = 0.2   # 混合推荐中内容推荐的权重
+HYBRID_ITEM_CF_WEIGHT = 0.5   # 混合推荐中物品协同过滤的权重
+HYBRID_USER_CF_WEIGHT = 0.3   # 混合推荐中用户协同过滤的权重
+TOPIC_WEIGHT = 0.2            # 内容相似度中 LDA 主题的权重（TF-IDF 权重为 1-TOPIC_WEIGHT）
+LDA_TOPICS = 20               # LDA 主题数量
+MMR_LAMBDA = 0.7              # MMR 重排的相关度权重（多样性权重为 1-MMR_LAMBDA）
+EVAL_TOP_K = 10               # 评估时使用的 Top-K
 
 # ==================== 界面参数 ====================
 APP_NAME = "Recomind 智能推荐系统"

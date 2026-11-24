@@ -79,6 +79,20 @@ class CollaborativeRecommender:
             scores[bi] = float((sims * neighbor_ratings).sum() / denom) if denom > 0 else 0.0
         return scores
 
+    def best_source_movie(self, user_id, movie_id):
+        """返回用户评分过的、与指定电影物品相似度最高的 (movie_id, sim)。"""
+        if user_id not in self.user_idx or movie_id not in self.movie_idx:
+            return None
+        ui = self.user_idx[user_id]
+        mi = self.movie_idx[movie_id]
+        user_vec = self.matrix[ui]
+        rated = np.where(user_vec > 0)[0]
+        if rated.size == 0:
+            return None
+        sim = self._item_similarity()[mi, rated]
+        top = int(np.argmax(sim))
+        return (self.movie_list[rated[top]], float(sim[top]))
+
     def recommend(self, user_id, top_n=10):
         """为目标用户推荐未评分电影，返回 [(Movie, score)]。"""
         scores = self.predict_scores(user_id)

@@ -14,6 +14,7 @@ import urllib.request
 from datetime import date
 
 import config
+from data.simulate_ratings import simulate_ratings
 from db.connection import execute_query, execute_update
 from db.init_db import init_database
 from utils.logger import get_logger
@@ -154,51 +155,8 @@ def ingest(pages=3, keep=False):
         time.sleep(0.12)
 
     print(f"完成：电影 {inserted} 部，影评 {review_count} 条")
-    _regenerate_ratings()
+    simulate_ratings()
     return inserted
-
-
-def _regenerate_ratings():
-    """为演示用户生成模拟评分（协同过滤需要用户-物品交互数据）。"""
-    users = {r["username"]: r["id"] for r in execute_query("SELECT id, username FROM users")}
-    if not users:
-        print("无用户，跳过评分生成")
-        return
-    pref = {
-        "alice": {"科幻", "冒险", "动画"},
-        "bob": {"科幻", "动作"},
-        "carol": {"剧情", "爱情"},
-        "dave": {"剧情", "悬疑"},
-        "erin": {"动作", "犯罪"},
-        "frank": {"动作", "犯罪", "惊悚"},
-    }
-    execute_update("DELETE FROM ratings")
-    movies = execute_query("SELECT id, genre, vote_average FROM movies ORDER BY id")
-    count = 0
-    for row in movies:
-        mid = row["id"]
-        genre = (row["genre"] or "").split("/")[0]
-        vote = row["vote_average"] or 0
-        owners = [u for u, genres in pref.items() if genre in genres] or ["alice"]
-        primary = owners[mid % len(owners)]
-        if primary not in users:
-            continue
-        score = 5 if vote >= 7.5 else 4
-        execute_update(
-            "INSERT INTO ratings (user_id, movie_id, score, comment) VALUES (%s,%s,%s,%s)",
-            (users[primary], mid, score, "很合我的口味。"),
-        )
-        count += 1
-        if mid % 3 == 0:
-            others = [u for u in users if u not in owners]
-            if others:
-                second = others[mid % len(others)]
-                execute_update(
-                    "INSERT INTO ratings (user_id, movie_id, score, comment) VALUES (%s,%s,%s,%s)",
-                    (users[second], mid, 3, "还可以。"),
-                )
-                count += 1
-    print(f"已生成模拟评分 {count} 条")
 
 
 if __name__ == "__main__":

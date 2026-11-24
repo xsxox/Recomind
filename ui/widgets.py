@@ -146,6 +146,15 @@ def make_icon(name, color="#4B5563", size=20):
             QPointF(s * 0.68, s * 0.66),
         ]))
 
+    elif name == "settings":
+        p.drawEllipse(QRectF(s * 0.34, s * 0.34, s * 0.32, s * 0.32))
+        p.drawEllipse(QRectF(s * 0.45, s * 0.45, s * 0.10, s * 0.10))
+        for k in range(8):
+            ang = math.radians(22.5 + k * 45)
+            inner = QPointF(s * 0.5 + s * 0.16 * math.cos(ang), s * 0.5 + s * 0.16 * math.sin(ang))
+            outer = QPointF(s * 0.5 + s * 0.30 * math.cos(ang), s * 0.5 + s * 0.30 * math.sin(ang))
+            p.drawLine(inner, outer)
+
     p.end()
     return QIcon(pm)
 

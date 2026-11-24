@@ -5,7 +5,7 @@
 """
 from datetime import datetime
 
-from PyQt5.QtCore import QSize, Qt
+from PyQt5.QtCore import QSize, QThread, Qt, pyqtSignal
 from PyQt5.QtWidgets import (QComboBox, QDialog, QFrame, QHBoxLayout,
                              QHeaderView, QLabel, QLineEdit, QMessageBox,
                              QPushButton, QSpinBox, QStackedWidget,
@@ -24,6 +24,22 @@ logger = get_logger("ui.manage")
 MOVIE_HEADERS = ["ID", "片名", "导演", "制片公司", "类型", "上映年份"]
 USER_HEADERS = ["ID", "用户名", "昵称", "性别", "年龄", "注册时间"]
 RATING_HEADERS = ["ID", "用户", "电影", "评分", "评语", "评分时间"]
+
+
+class RefreshWorker(QThread):
+    """后台执行数据更新任务的线程。"""
+    done = pyqtSignal(str)
+
+    def __init__(self, func, parent=None):
+        super().__init__(parent)
+        self.func = func
+
+    def run(self):
+        try:
+            self.func()
+            self.done.emit("完成")
+        except Exception as exc:  # noqa: BLE001
+            self.done.emit(f"失败：{exc}")
 
 
 class MovieEditDialog(QDialog):
@@ -202,7 +218,7 @@ class ManagePage(QWidget):
         seg_layout.setContentsMargins(4, 4, 4, 4)
         seg_layout.setSpacing(4)
 
-        for idx, name in enumerate(["电影管理", "用户管理", "评分数据"]):
+        for idx, name in enumerate(["电影管理", "用户管理", "评分数据", "数据更新"]):
             btn = QPushButton(name)
             btn.setObjectName("segmentBtn")
             btn.setCheckable(True)
@@ -229,6 +245,7 @@ class ManagePage(QWidget):
         self.stack.addWidget(self._build_movie_tab())
         self.stack.addWidget(self._build_user_tab())
         self.stack.addWidget(self._build_rating_tab())
+        self.stack.addWidget(self._build_data_tab())
         card_layout.addWidget(self.stack, 1)
 
         root.addWidget(main_card, 1)
@@ -333,6 +350,77 @@ class ManagePage(QWidget):
         self.rating_table = self._make_table(RATING_HEADERS)
         layout.addWidget(self.rating_table)
         return widget
+
+    # ---------- 数据更新（TMDB） ----------
+
+    def _build_data_tab(self):
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(0, 4, 0, 0)
+        layout.setSpacing(12)
+
+        tip = QLabel("以下操作会访问 TMDB 并重建本地数据，耗时较长，请耐心等待。")
+        tip.setObjectName("subText")
+        tip.setWordWrap(True)
+        layout.addWidget(tip)
+
+        btn_grid = QHBoxLayout()
+        btn_grid.setSpacing(10)
+        self.fetch_movies_btn = QPushButton("  拉取真实片库")
+        self.fetch_posters_btn = QPushButton("  抓取海报")
+        self.fetch_reviews_btn = QPushButton("  抓取影评")
+        self.fetch_keywords_btn = QPushButton("  抓取关键词")
+        self.gen_ratings_btn = QPushButton("  重新生成评分")
+        for btn in (self.fetch_movies_btn, self.fetch_posters_btn, self.fetch_reviews_btn,
+                    self.fetch_keywords_btn, self.gen_ratings_btn):
+            btn.setObjectName("secondaryBtn")
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setMinimumHeight(40)
+            btn_grid.addWidget(btn)
+        btn_grid.addStretch()
+        layout.addLayout(btn_grid)
+
+        self.fetch_movies_btn.clicked.connect(self._refresh_movies)
+        self.fetch_posters_btn.clicked.connect(self._refresh_posters)
+        self.fetch_reviews_btn.clicked.connect(self._refresh_reviews)
+        self.fetch_keywords_btn.clicked.connect(self._refresh_keywords)
+        self.gen_ratings_btn.clicked.connect(self._refresh_ratings)
+
+        self.update_status = QLabel("尚未执行任何更新")
+        self.update_status.setObjectName("subText")
+        layout.addWidget(self.update_status)
+        layout.addStretch()
+        return widget
+
+    def _run_refresh(self, label, func):
+        self.update_status.setText(f"{label}：更新中…")
+        self._worker = RefreshWorker(func)
+        self._worker.done.connect(lambda msg: self._on_refresh_done(label, msg))
+        self._worker.start()
+
+    def _on_refresh_done(self, label, msg):
+        self.update_status.setText(f"{label}：{msg}")
+        self.refresh_all()
+
+    def _refresh_movies(self):
+        from scripts import fetch_movies
+        self._run_refresh("拉取真实片库", lambda: fetch_movies.ingest(pages=3))
+
+    def _refresh_posters(self):
+        from scripts import fetch_posters
+        self._run_refresh("抓取海报", lambda: fetch_posters.fetch_all())
+
+    def _refresh_reviews(self):
+        from scripts import fetch_reviews
+        self._run_refresh("抓取影评", lambda: fetch_reviews.fetch_all())
+
+    def _refresh_keywords(self):
+        from scripts import fetch_keywords
+        self._run_refresh("抓取关键词", lambda: fetch_keywords.fetch_all())
+
+    def _refresh_ratings(self):
+        from data import simulate_ratings
+        self._run_refresh("重新生成评分", lambda: simulate_ratings.simulate_ratings())
 
     def _make_table(self, headers):
         table = QTableWidget()

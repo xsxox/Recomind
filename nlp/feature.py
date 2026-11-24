@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 特征提取模块
-基于 scikit-learn 的 TF-IDF 将文本转换为向量，并用余弦相似度衡量文本相似程度。
+基于 scikit-learn 的 TF-IDF（支持 1~2 元词组）将文本转换为向量，
+并用余弦相似度衡量文本相似程度。
 """
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -13,17 +14,16 @@ logger = get_logger("nlp.feature")
 
 
 class TextFeatureExtractor:
-    """TF-IDF 特征提取器。"""
+    """TF-IDF 特征提取器（词 + 二元词组）。"""
 
     def __init__(self):
-        # 文本已由 jieba 分词并用空格连接，这里按空白切分即可
-        self.vectorizer = TfidfVectorizer(token_pattern=r"(?u)\S+")
+        # 文本已由 jieba 分词并用空格连接，这里按空白切分；ngram_range=(1,2) 引入词组
+        self.vectorizer = TfidfVectorizer(token_pattern=r"(?u)\S+", ngram_range=(1, 2))
         self.matrix = None  # 语料 TF-IDF 稀疏矩阵
 
     def fit_transform(self, texts):
         """拟合语料并返回 TF-IDF 矩阵。"""
         segmented = [segment(t) for t in texts]
-        # 若语料全为空文本，返回 None，由调用方处理
         if not any(segmented):
             self.matrix = None
             return None

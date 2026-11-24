@@ -11,11 +11,13 @@
 ## 一、功能特性
 
 - 用户注册 / 登录（密码 SHA-256 加盐哈希存储）
-- **个性推荐**：融合内容推荐 + 协同过滤的混合推荐
-- **关键词推荐**：输入兴趣描述，按文本相似度推荐电影
+- **个性推荐**：融合内容推荐 + 物品/用户协同过滤的混合推荐 + MMR 多样性重排
+- **关键词推荐**：输入兴趣描述，按文本语义推荐电影
 - **电影浏览 / 搜索**：按片名、导演、关键词搜索，按类型筛选
-- **电影详情**：查看简介、平均评分，提交评分与评语，展示相似电影
-- **数据管理**：电影增删改查、用户管理、评分数据查看与统计
+- **电影详情**：查看简介、TMDB 评分与真实影评，提交评分与评语，展示相似电影
+- **个人中心**：查看/编辑资料、修改密码、我的评分、浏览历史
+- **个性化设置**：偏好类型、推荐条数、推荐算法开关（实时作用于推荐）
+- **后台管理**（管理员专属）：电影/用户/评分管理、TMDB 数据更新
 
 ## 二、技术栈
 
@@ -25,7 +27,7 @@
 | 桌面界面 | PyQt5 |
 | 数据库 | MySQL 8.0（PyMySQL 驱动） |
 | 中文分词 | jieba |
-| 机器学习 | scikit-learn（TF-IDF、余弦相似度） |
+| 机器学习 | scikit-learn（TF-IDF、LDA 主题模型、余弦相似度） |
 | 数值计算 | numpy |
 
 ## 三、项目结构
@@ -33,41 +35,63 @@
 ```
 Recomind/
 ├── main.py                  # 程序入口
-├── config.py                # 全局配置（数据库、路径、推荐参数）
+├── config.py                # 全局配置（数据库、TMDB、推荐/评估参数）
 ├── requirements.txt         # 依赖清单
 ├── db/                      # 数据库层
 │   ├── connection.py        #   连接管理与通用增删改查
 │   ├── models.py            #   建表 DDL 与数据实体
-│   └── init_db.py           #   建库建表初始化
+│   └── init_db.py           #   建库建表与字段迁移
 ├── nlp/                     # NLP 层
 │   ├── text_processor.py    #   文本清洗、jieba 分词、停用词过滤
-│   └── feature.py           #   TF-IDF 向量化与余弦相似度
+│   ├── feature.py           #   TF-IDF 向量化（词 + 二元词组）
+│   └── topic.py             #   LDA 主题模型
 ├── recommender/             # 推荐算法层
-│   ├── content_based.py     #   基于内容的推荐
-│   ├── collaborative.py     #   基于物品的协同过滤
-│   └── hybrid.py            #   混合推荐
+│   ├── content_based.py     #   内容推荐（TF-IDF + LDA）
+│   ├── collaborative.py     #   物品协同过滤（Item-CF）
+│   ├── user_cf.py           #   用户协同过滤（User-CF）
+│   ├── hybrid.py            #   混合推荐（加权融合）
+│   └── diversity.py         #   MMR 多样性重排
 ├── services/                # 业务服务层
 │   ├── user_service.py      #   用户注册登录
-│   ├── movie_service.py      #   电影增删改查
+│   ├── movie_service.py     #   电影增删改查
 │   ├── rating_service.py    #   评分与统计
 │   ├── history_service.py   #   浏览历史
-│   └── recommend_service.py #   推荐编排
+│   ├── setting_service.py   #   用户设置
+│   └── recommend_service.py #   推荐编排与解释
 ├── data/                    # 数据层
-│   ├── sample_data.py       #   示例电影/用户/评分
-│   ├── seed_data.py         #   数据导入脚本
+│   ├── sample_data.py       #   离线示例电影/用户/评分
+│   ├── seed_data.py         #   离线数据导入
+│   ├── simulate_ratings.py  #   模拟评分生成（演示协同过滤）
 │   └── stopwords.txt        #   停用词表
+├── evaluation/              # 评估层
+│   └── metrics.py           #   Precision/Recall/NDCG/Coverage/Diversity
 ├── ui/                      # 界面层
 │   ├── main_window.py       #   主窗口
 │   ├── login_dialog.py      #   登录注册
 │   ├── recommend_page.py    #   个性推荐页
 │   ├── search_page.py       #   电影浏览搜索页
-│   ├── detail_dialog.py     #   电影详情与评分
-│   ├── manage_page.py       #   数据管理页
-│   ├── widgets.py           #   通用组件（电影卡片、星级评分）
+│   ├── detail_dialog.py     #   电影详情与评分/影评
+│   ├── profile_page.py      #   个人中心页
+│   ├── settings_page.py     #   设置页
+│   ├── manage_page.py       #   后台管理页
+│   ├── widgets.py           #   通用组件
 │   └── styles.py            #   全局样式
 ├── scripts/
 │   ├── init_database.sql    #   数据库初始化 SQL
-│   └── init_database.bat    #   一键初始化脚本（Windows）
+│   ├── init_database.bat    #   一键初始化脚本（Windows）
+│   ├── fetch_movies.py      #   从 TMDB 拉取真实片库
+│   ├── fetch_posters.py     #   抓取电影海报
+│   ├── fetch_reviews.py     #   抓取真实影评
+│   ├── fetch_keywords.py    #   抓取关键词
+│   └── evaluate.py          #   离线推荐评估
+├── tests/                   # 测试
+│   ├── test_system.py       #   系统自检
+│   ├── test_metrics.py      #   评估指标单测
+│   └── test_recommender.py  #   推荐算法单测
+├── docs/
+│   ├── 设计文档.md          #   架构与算法设计
+│   ├── 评估报告.md          #   离线评估结果
+│   └── screenshots/         #   界面截图
 └── README.md
 ```
 
@@ -159,22 +183,22 @@ python main.py
 
   | 账号 | 密码 | 偏好 |
   | --- | --- | --- |
-  | alice | 123456 | 文学 |
-  | carol | 123456 | 计算机 |
-  | erin | 123456 | 历史 |
+  | alice | 123456 | 科幻 / 动作 |
+  | carol | 123456 | 剧情 / 爱情 |
+  | erin | 123456 | 动作 / 犯罪 |
 
 - 也可切换到「注册」页自行注册新账号。
 
 ### 个性推荐
 
 登录后默认进入「个性推荐」页，系统会：
-1. 基于你高分评价的电影，用 TF-IDF + 余弦相似度做**内容推荐**；
-2. 基于全体用户评分矩阵做**协同过滤**；
-3. 二者按权重融合为**混合推荐**结果。
+1. 基于你高分评价的电影，用 TF-IDF + LDA 主题模型做**内容推荐**；
+2. 基于全体用户评分矩阵做**物品协同过滤**与**用户协同过滤**；
+3. 三类结果按权重融合为**混合推荐**，并经 MMR 做**多样性重排**。
 
 新用户（无评分、无浏览）会退化为**热门电影推荐**。
 
-也可以在输入框输入兴趣描述（如“科幻 宇宙”“机器学习 编程”），点击「智能推荐」按文本相似度推荐。
+也可以在输入框输入兴趣描述（如“科幻 太空”“动作 谍战”），点击「智能匹配」按文本语义推荐。
 
 ### 电影浏览与搜索
 
@@ -215,7 +239,19 @@ python main.py
 
 ## 九、算法说明（答辩要点）
 
-- **内容推荐**：对电影文本（片名+导演+类型+简介）做 jieba 分词、去停用词，用 TF-IDF 构造特征向量，余弦相似度衡量电影间相似程度；
-- **协同过滤**：基于用户评分矩阵做物品相似度计算（评分均值中心化 + 余弦相似度），为用户预测未评分电影的兴趣分；
-- **混合推荐**：将两类推荐分数分别归一化后按权重加权融合（默认内容 0.6、协同 0.4）；
+- **内容推荐**：对电影文本（片名+导演+类型+简介）做 jieba 分词、去停用词，用 TF-IDF（词 + 二元词组）与 LDA 主题模型构造特征，按权重融合余弦相似度；
+- **物品协同过滤**：基于评分矩阵做物品相似度（评分均值中心化 + 余弦相似度），用 K 近邻预测未评分电影兴趣分；
+- **用户协同过滤**：计算用户相似度，用相似用户的评分加权预测目标用户兴趣；
+- **混合推荐**：三类结果归一化后按权重融合（内容 0.2 / 物品协同 0.5 / 用户协同 0.3），再用 MMR 做多样性重排；
+- **推荐解释**：根据主导来源生成自然语言解释；
 - **冷启动**：无历史数据的新用户退化为热门推荐或基于浏览历史的推荐。
+
+## 十、离线评估
+
+运行评估脚本，对各类推荐算法与基线做离线评测（Precision@K / Recall@K / NDCG / Coverage / Diversity）：
+
+```bash
+python -m scripts.evaluate --k 10 --ratio 0.2 --seed 42
+```
+
+评估结果与设计说明见 [docs/评估报告.md](docs/评估报告.md) 与 [docs/设计文档.md](docs/设计文档.md)。

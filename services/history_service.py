@@ -28,6 +28,20 @@ class HistoryService:
         )
         return rows
 
+    def get_user_history_with_movies(self, user_id, limit=50):
+        """返回用户浏览历史（联表电影信息）。"""
+        rows = execute_query(
+            "SELECT h.id, h.browse_time, m.id AS movie_id, m.title, m.genre, m.poster_color "
+            "FROM browse_history h JOIN movies m ON h.movie_id = m.id "
+            "WHERE h.user_id=%s ORDER BY h.browse_time DESC, h.id DESC LIMIT %s",
+            (user_id, limit),
+        )
+        return rows
+
+    def count_user_history(self, user_id):
+        rows = execute_query("SELECT COUNT(*) AS c FROM browse_history WHERE user_id=%s", (user_id,))
+        return rows[0]["c"] if rows else 0
+
     def clear_user_history(self, user_id):
         return execute_update("DELETE FROM browse_history WHERE user_id=%s", (user_id,))
 

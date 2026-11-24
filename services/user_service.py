@@ -60,5 +60,33 @@ class UserService:
         rows = execute_query("SELECT COUNT(*) AS c FROM users")
         return rows[0]["c"] if rows else 0
 
+    def update_profile(self, user_id, nickname="", gender="", age=0):
+        """更新用户资料，返回受影响行数。"""
+        rows, _ = execute_update(
+            "UPDATE users SET nickname=%s, gender=%s, age=%s WHERE id=%s",
+            (nickname, gender, age, user_id),
+        )
+        return rows
+
+    def change_password(self, user_id, old_password, new_password):
+        """修改密码，返回 (是否成功, 错误信息)。"""
+        user = self.get_user(user_id)
+        if user is None:
+            return False, "用户不存在"
+        if not verify_password(old_password, user.password):
+            return False, "原密码错误"
+        if len(new_password) < 4:
+            return False, "新密码长度不能少于 4 位"
+        execute_update(
+            "UPDATE users SET password=%s WHERE id=%s",
+            (hash_password(new_password), user_id),
+        )
+        return True, None
+
+    @staticmethod
+    def is_admin(user):
+        """判断用户是否为管理员（用户名为 admin）。"""
+        return (user.username or "").strip().lower() == "admin"
+
     def delete_user(self, user_id):
         return execute_update("DELETE FROM users WHERE id=%s", (user_id,))
