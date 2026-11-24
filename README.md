@@ -142,6 +142,12 @@ python main.py
    python -m scripts.fetch_posters --force
    ```
 
+5. 如需单独刷新影评（中文优先，无则英文兜底）：
+
+   ```bash
+   python -m scripts.fetch_reviews
+   ```
+
 采集内容：高分榜 + 热门榜的真实电影（自动过滤冷门/未上映）、导演、制片公司、类型、简介、海报、TMDB 评分与评分人数、真实影评；
 同时为演示用户生成模拟评分用于协同过滤。无网络或未配置 Key 时，程序仍可用离线示例数据运行。
 
