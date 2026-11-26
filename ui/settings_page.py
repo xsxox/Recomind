@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-设置页
-配置推荐偏好（偏好类型、推荐条数、推荐算法开关），保存后作用于个性推荐。
+偏好设置页
+暗夜流式类型胶囊 + 推荐引擎策略配置，支持 20~200 部多页推荐规模调节。
 """
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QCheckBox, QFrame, QHBoxLayout, QLabel, QMessageBox,
-                             QPushButton, QSpinBox, QVBoxLayout, QWidget)
+                             QPushButton, QScrollArea, QSpinBox, QVBoxLayout,
+                             QWidget)
 
-from ui.widgets import apply_shadow
+from ui.widgets import FlowContainer
 from utils.logger import get_logger
 
 logger = get_logger("ui.settings")
@@ -26,75 +27,136 @@ class SettingsPage(QWidget):
         self._build()
         self.refresh()
 
-    def _section_title(self, text):
-        lbl = QLabel(text)
-        lbl.setObjectName("sectionTitle")
-        return lbl
-
     def _build(self):
-        root = QVBoxLayout(self)
-        root.setContentsMargins(32, 28, 32, 24)
-        root.setSpacing(16)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
 
-        title = QLabel("设置")
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        content = QWidget()
+        content.setObjectName("settingsScrollContent")
+        content.setStyleSheet("QWidget#settingsScrollContent { background: transparent; }")
+
+        root = QVBoxLayout(content)
+        root.setContentsMargins(36, 26, 36, 30)
+        root.setSpacing(18)
+
+        title_box = QVBoxLayout()
+        title_box.setSpacing(2)
+        title = QLabel("偏好设置")
         title.setObjectName("pageTitle")
-        root.addWidget(title)
+        subtitle = QLabel("定制你喜欢的影片类型、推荐总规模及混合算法策略")
+        subtitle.setObjectName("subText")
+        title_box.addWidget(title)
+        title_box.addWidget(subtitle)
+        root.addLayout(title_box)
 
-        card = QFrame()
-        card.setObjectName("panel")
-        apply_shadow(card, blur=18, y_offset=4, alpha=12)
-        c = QVBoxLayout(card)
-        c.setContentsMargins(24, 22, 24, 22)
-        c.setSpacing(14)
+        genre_card = QFrame()
+        genre_card.setObjectName("panel")
+        g_layout = QVBoxLayout(genre_card)
+        g_layout.setContentsMargins(24, 22, 24, 22)
+        g_layout.setSpacing(12)
 
-        c.addWidget(self._section_title("推荐偏好"))
+        g_title = QLabel("感兴趣的电影类型")
+        g_title.setObjectName("sectionTitle")
+        g_sub = QLabel("点击标签多选偏好题材，保存后立即作用于「个性推荐」排序与冷启动")
+        g_sub.setObjectName("subText")
+        g_layout.addWidget(g_title)
+        g_layout.addWidget(g_sub)
 
-        c.addWidget(QLabel("偏好类型（可多选）"))
-        genre_row = QHBoxLayout()
-        genre_row.setSpacing(8)
+        chip_container = FlowContainer(h_spacing=10, v_spacing=10, margin=0)
         for g in ALL_GENRES:
-            cb = QCheckBox(g)
-            cb.setCursor(Qt.PointingHandCursor)
-            self.genre_checks[g] = cb
-            genre_row.addWidget(cb)
-        genre_row.addStretch()
-        c.addLayout(genre_row)
+            btn = QPushButton(g)
+            btn.setObjectName("genreChip")
+            btn.setCheckable(True)
+            btn.setCursor(Qt.PointingHandCursor)
+            self.genre_checks[g] = btn
+            chip_container.flow.addWidget(btn)
+        g_layout.addWidget(chip_container)
+        root.addWidget(genre_card)
+
+        algo_card = QFrame()
+        algo_card.setObjectName("panel")
+        a_layout = QVBoxLayout(algo_card)
+        a_layout.setContentsMargins(24, 22, 24, 22)
+        a_layout.setSpacing(16)
+
+        a_title = QLabel("推荐引擎配置")
+        a_title.setObjectName("sectionTitle")
+        a_layout.addWidget(a_title)
 
         top_row = QHBoxLayout()
-        top_row.setSpacing(12)
-        top_row.addWidget(QLabel("推荐条数"))
+        top_text = QVBoxLayout()
+        top_text.setSpacing(2)
+        t_lbl = QLabel("个性推荐片单规模")
+        t_lbl.setStyleSheet("font-size: 15px; font-weight: bold; color: #F8FAFC;")
+        t_desc = QLabel("每页展示 20 部电影，建议设置 60 ~ 120 部以便多页浏览（范围 20 - 200）")
+        t_desc.setObjectName("subText")
+        top_text.addWidget(t_lbl)
+        top_text.addWidget(t_desc)
+
         self.top_spin = QSpinBox()
-        self.top_spin.setRange(5, 50)
-        self.top_spin.setValue(12)
-        self.top_spin.setMinimumHeight(38)
-        self.top_spin.setMinimumWidth(80)
+        self.top_spin.setRange(20, 200)
+        self.top_spin.setSingleStep(20)
+        self.top_spin.setValue(80)
+        self.top_spin.setMinimumHeight(40)
+        self.top_spin.setMinimumWidth(110)
+
+        top_row.addLayout(top_text, 1)
         top_row.addWidget(self.top_spin)
-        top_row.addSpacing(24)
-        top_row.addWidget(QLabel("推荐算法"))
-        self.check_content = QCheckBox("内容推荐")
-        self.check_item = QCheckBox("物品协同过滤")
-        self.check_user = QCheckBox("用户协同过滤")
-        for cb in (self.check_content, self.check_item, self.check_user):
-            cb.setCursor(Qt.PointingHandCursor)
-            top_row.addWidget(cb)
-        top_row.addStretch()
-        c.addLayout(top_row)
+        a_layout.addLayout(top_row)
+
+        algo_row = QHBoxLayout()
+        algo_row.setSpacing(14)
+        self.check_content, c1 = self._make_algo_box(
+            "内容推荐 (NLP)",
+            "基于简介、类型、关键词与 TMDB 影评的 TF-IDF + LDA 语义相似度"
+        )
+        self.check_item, c2 = self._make_algo_box(
+            "物品协同过滤 (Item-CF)",
+            "基于评分矩阵计算影片关联度，推荐相似高分作品"
+        )
+        self.check_user, c3 = self._make_algo_box(
+            "用户协同过滤 (User-CF)",
+            "发现口味相近的影迷圈子，推荐同好高分佳作"
+        )
+        algo_row.addWidget(c1)
+        algo_row.addWidget(c2)
+        algo_row.addWidget(c3)
+        a_layout.addLayout(algo_row)
 
         btn_row = QHBoxLayout()
-        self.save_btn = QPushButton("保存设置")
-        self.save_btn.setMinimumHeight(40)
+        self.save_btn = QPushButton("保存并应用到推荐")
+        self.save_btn.setMinimumHeight(42)
         self.save_btn.setCursor(Qt.PointingHandCursor)
         self.save_btn.clicked.connect(self._save)
         btn_row.addWidget(self.save_btn)
         btn_row.addStretch()
-        c.addLayout(btn_row)
+        a_layout.addLayout(btn_row)
 
-        hint = QLabel("保存后，「个性推荐」页会按此偏好重新生成推荐。")
-        hint.setObjectName("subText")
-        c.addWidget(hint)
-
-        root.addWidget(card)
+        root.addWidget(algo_card)
         root.addStretch()
+
+        scroll.setWidget(content)
+        outer.addWidget(scroll)
+
+    def _make_algo_box(self, title, desc):
+        box = QFrame()
+        box.setObjectName("subPanel")
+        layout = QVBoxLayout(box)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(6)
+
+        cb = QCheckBox(title)
+        cb.setCursor(Qt.PointingHandCursor)
+        d = QLabel(desc)
+        d.setWordWrap(True)
+        d.setStyleSheet("color: #94A3B8; font-size: 13px; padding-left: 30px;")
+
+        layout.addWidget(cb)
+        layout.addWidget(d)
+        layout.addStretch()
+        return cb, box
 
     def refresh(self):
         user = self.main.get_user()
@@ -116,4 +178,5 @@ class SettingsPage(QWidget):
             self.check_item.isChecked(),
             self.check_user.isChecked(),
         )
-        QMessageBox.information(self, "成功", "设置已保存，请到「个性推荐」页刷新查看效果")
+        self.main.recommend_page.refresh()
+        QMessageBox.information(self, "成功", "偏好设置已保存，「个性推荐」已同步刷新")

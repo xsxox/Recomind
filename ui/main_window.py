@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-主窗口
-极简纯白侧边栏 + 自绘矢量图标 + 页面切换容器，
-包含：个性推荐、电影浏览、个人中心、设置，以及仅管理员可见的后台管理。
+主窗口 (v2.1 现代流媒体客户端布局)
+参考 Spotify / Plex / Apple TV+ 桌面端：
+  左侧固定沉浸式分组边栏（品牌 + 分组导航 + 底部用户卡片）
+  右侧全屏无边框流媒体主画布
 """
 from PyQt5.QtCore import QSize, Qt
 from PyQt5.QtWidgets import (QFrame, QHBoxLayout, QLabel, QMainWindow,
@@ -16,6 +17,8 @@ from services.rating_service import RatingService
 from services.recommend_service import RecommendService
 from services.setting_service import SettingService
 from services.user_service import UserService
+from ui.assistant_page import AssistantPage
+from ui.dashboard_page import DashboardPage
 from ui.detail_dialog import DetailDialog
 from ui.manage_page import ManagePage
 from ui.profile_page import ProfilePage
@@ -46,31 +49,23 @@ class MainWindow(QMainWindow):
         self._nav_items = []
 
         self.setWindowTitle(f"{config.APP_NAME} v{config.APP_VERSION}")
-        self.resize(1300, 860)
-        self.setMinimumSize(1080, 720)
+        self.resize(1380, 880)
+        self.setMinimumSize(1120, 720)
         self._build_ui()
 
-    # ---------- 对外接口 ----------
-
     def get_user(self):
-        """返回当前登录用户。"""
         return self.current_user
 
     def open_detail(self, movie):
-        """打开电影详情对话框，关闭后刷新统计。"""
         dialog = DetailDialog(movie, self)
         dialog.exec_()
         self.manage_page.refresh_all()
         self.profile_page.refresh()
 
     def refresh_user_display(self):
-        """刷新侧边栏与个人中心里展示的用户信息。"""
         display = self.current_user.nickname or self.current_user.username
-        self.sidebar_avatar.setText(display[0].upper() if display else "U")
-        self.sidebar_name_label.setText(display)
-        self.sidebar_handle_label.setText(f"@{self.current_user.username}")
-
-    # ---------- 界面构建 ----------
+        self.top_avatar.setText(display[0].upper() if display else "U")
+        self.top_name_label.setText(display)
 
     def _build_ui(self):
         central = QWidget()
@@ -83,12 +78,21 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
         self.recommend_page = RecommendPage(self)
         self.search_page = SearchPage(self)
+        self.assistant_page = AssistantPage(self)
         self.profile_page = ProfilePage(self)
         self.settings_page = SettingsPage(self)
         self.manage_page = ManagePage(self)
+        self.dashboard_page = DashboardPage(self)
 
-        for page in (self.recommend_page, self.search_page, self.profile_page,
-                     self.settings_page, self.manage_page):
+        for page in (
+            self.recommend_page,
+            self.search_page,
+            self.assistant_page,
+            self.profile_page,
+            self.settings_page,
+            self.manage_page,
+            self.dashboard_page,
+        ):
             self.stack.addWidget(page)
         root.addWidget(self.stack, 1)
 
@@ -98,124 +102,155 @@ class MainWindow(QMainWindow):
         self.search_page.refresh()
 
     def _build_sidebar(self):
-        sidebar = QFrame()
-        sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(244)
+        bar = QFrame()
+        bar.setObjectName("sideBar")
+        bar.setFixedWidth(232)
 
-        layout = QVBoxLayout(sidebar)
-        layout.setContentsMargins(18, 26, 18, 20)
+        layout = QVBoxLayout(bar)
+        layout.setContentsMargins(16, 22, 16, 18)
         layout.setSpacing(6)
 
+        # 品牌标识区
         brand_row = QHBoxLayout()
+        brand_row.setContentsMargins(8, 0, 4, 14)
         brand_row.setSpacing(10)
         logo = QLabel("R")
-        logo.setFixedSize(36, 36)
+        logo.setFixedSize(32, 32)
         logo.setAlignment(Qt.AlignCenter)
         logo.setStyleSheet(
-            "background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #6366F1, stop:1 #4F46E5);"
-            "color: #FFFFFF; font-size: 18px; font-weight: bold; border-radius: 10px;"
+            "background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #38BDF8, stop:1 #0284C7);"
+            "color: #FFFFFF; font-size: 16px; font-weight: bold; border-radius: 9px;"
         )
-        brand_col = QVBoxLayout()
-        brand_col.setSpacing(1)
-        brand = QLabel("Recomind")
+        brand = QLabel("RECOMIND")
         brand.setObjectName("brandTitle")
-        sub = QLabel(f"智能推荐系统 v{config.APP_VERSION}")
-        sub.setObjectName("brandSub")
-        brand_col.addWidget(brand)
-        brand_col.addWidget(sub)
-
+        tag = QLabel("AI")
+        tag.setObjectName("brandTag")
         brand_row.addWidget(logo)
-        brand_row.addLayout(brand_col, 1)
+        brand_row.addWidget(brand)
+        brand_row.addWidget(tag)
+        brand_row.addStretch()
         layout.addLayout(brand_row)
 
-        layout.addSpacing(26)
-
-        nav_title = QLabel("导航菜单")
-        nav_title.setStyleSheet("color: #9CA3AF; font-size: 12px; font-weight: bold; padding-left: 10px;")
-        layout.addWidget(nav_title)
-        layout.addSpacing(4)
-
-        # 导航项：(图标, 文案, 页面栈下标, 是否仅管理员)
         is_admin = self.user_service.is_admin(self.current_user)
-        all_items = [
-            ("sparkles", "  个性推荐", 0, False),
-            ("search", "  电影浏览", 1, False),
-            ("users", "  个人中心", 2, False),
-            ("settings", "  设置", 3, False),
-            ("layers", "  后台管理", 4, True),
+        groups = [
+            ("发现与探索", [
+                ("sparkles", "个性推荐", 0, False),
+                ("movie", "影片库", 1, False),
+                ("bot", "AI 影伴", 2, False),
+            ]),
+            ("数据与实验室", [
+                ("users", "个人画像", 3, False),
+                ("chart-bar", "算法分析", 6, False),
+                ("settings", "偏好设置", 4, False),
+                ("layers", "后台管理", 5, True),
+            ]),
         ]
-        self._nav_items = [(ic, lb, si) for ic, lb, si, admin in all_items if not admin or is_admin]
 
-        for nav_index, (icon_name, label, _stack_index) in enumerate(self._nav_items):
-            btn = QPushButton(label)
-            btn.setObjectName("navBtn")
-            btn.setCheckable(True)
-            btn.setMinimumHeight(46)
-            btn.setIconSize(QSize(19, 19))
-            btn.setCursor(Qt.PointingHandCursor)
-            btn.clicked.connect(lambda _c, i=nav_index: self._switch_page(i))
-            self._nav_buttons.append(btn)
-            layout.addWidget(btn)
+        for group_title, items in groups:
+            visible = [(ic, lb, si) for ic, lb, si, admin in items if not admin or is_admin]
+            if not visible:
+                continue
+            g_lbl = QLabel(group_title)
+            g_lbl.setObjectName("navGroupLabel")
+            layout.addSpacing(8)
+            layout.addWidget(g_lbl)
+            layout.addSpacing(2)
 
-        self._update_nav_state(0)
+            for icon_name, label, stack_idx in visible:
+                nav_index = len(self._nav_items)
+                self._nav_items.append((icon_name, label, stack_idx))
+                btn = QPushButton(f"  {label}")
+                btn.setObjectName("sideNavBtn")
+                btn.setCheckable(True)
+                btn.setIconSize(QSize(18, 18))
+                btn.setMinimumHeight(42)
+                btn.setCursor(Qt.PointingHandCursor)
+                btn.clicked.connect(lambda _c, i=nav_index: self._switch_page(i))
+                self._nav_buttons.append(btn)
+                layout.addWidget(btn)
+
         layout.addStretch()
 
-        # 底部用户卡片
-        user_card = QFrame()
-        user_card.setObjectName("userCard")
-        u_layout = QVBoxLayout(user_card)
-        u_layout.setContentsMargins(14, 14, 14, 14)
-        u_layout.setSpacing(12)
+        # AI 引擎在线状态指示卡
+        engine_card = QFrame()
+        engine_card.setObjectName("engineStatusCard")
+        ec_layout = QVBoxLayout(engine_card)
+        ec_layout.setContentsMargins(12, 10, 12, 10)
+        ec_layout.setSpacing(4)
+        ec_top = QHBoxLayout()
+        ec_top.setSpacing(6)
+        dot = QLabel("●")
+        dot.setStyleSheet("color: #10B981; font-size: 10px;")
+        ec_title = QLabel("混合推荐引擎在线")
+        ec_title.setStyleSheet("color: #E2E8F0; font-size: 12px; font-weight: bold;")
+        ec_top.addWidget(dot)
+        ec_top.addWidget(ec_title)
+        ec_top.addStretch()
+        ec_layout.addLayout(ec_top)
+        ec_sub = QLabel("SBERT/LSA · SVD · CF · MMR")
+        ec_sub.setStyleSheet("color: #38BDF8; font-size: 10px; font-weight: 500;")
+        ec_layout.addWidget(ec_sub)
+        layout.addWidget(engine_card)
+        layout.addSpacing(8)
 
-        info_row = QHBoxLayout()
-        info_row.setSpacing(10)
-        display_name = self.current_user.nickname or self.current_user.username
-        self.sidebar_avatar = QLabel(display_name[0].upper() if display_name else "U")
-        self.sidebar_avatar.setObjectName("userAvatar")
-        self.sidebar_avatar.setFixedSize(38, 38)
-        self.sidebar_avatar.setAlignment(Qt.AlignCenter)
+        # 底部当前用户胶囊卡
+        user_card = QFrame()
+        user_card.setObjectName("sideUserCard")
+        uc_layout = QHBoxLayout(user_card)
+        uc_layout.setContentsMargins(10, 10, 10, 10)
+        uc_layout.setSpacing(10)
+
+        display = self.current_user.nickname or self.current_user.username
+        self.top_avatar = QLabel(display[0].upper() if display else "U")
+        self.top_avatar.setObjectName("userAvatar")
+        self.top_avatar.setFixedSize(34, 34)
+        self.top_avatar.setAlignment(Qt.AlignCenter)
+        uc_layout.addWidget(self.top_avatar)
 
         name_col = QVBoxLayout()
         name_col.setSpacing(1)
-        self.sidebar_name_label = QLabel(display_name)
-        self.sidebar_name_label.setObjectName("userName")
-        self.sidebar_handle_label = QLabel(f"@{self.current_user.username}")
-        self.sidebar_handle_label.setObjectName("userHandle")
-        name_col.addWidget(self.sidebar_name_label)
-        name_col.addWidget(self.sidebar_handle_label)
+        self.top_name_label = QLabel(display)
+        self.top_name_label.setObjectName("userName")
+        role_lbl = QLabel("管理员" if is_admin else "影迷会员")
+        role_lbl.setStyleSheet("color: #71717A; font-size: 11px;")
+        name_col.addWidget(self.top_name_label)
+        name_col.addWidget(role_lbl)
+        uc_layout.addLayout(name_col, 1)
 
-        info_row.addWidget(self.sidebar_avatar)
-        info_row.addLayout(name_col, 1)
-        u_layout.addLayout(info_row)
-
-        logout_btn = QPushButton("  退出登录")
+        logout_btn = QPushButton()
         logout_btn.setObjectName("logoutBtn")
-        logout_btn.setIcon(make_icon("logout", "#4B5563", 16))
-        logout_btn.setIconSize(QSize(16, 16))
+        logout_btn.setIcon(make_icon("logout", "#A1A1AA", 15))
+        logout_btn.setIconSize(QSize(15, 15))
+        logout_btn.setFixedSize(32, 32)
+        logout_btn.setToolTip("退出登录")
         logout_btn.setCursor(Qt.PointingHandCursor)
         logout_btn.clicked.connect(self._logout)
-        u_layout.addWidget(logout_btn)
+        uc_layout.addWidget(logout_btn)
 
         layout.addWidget(user_card)
-        return sidebar
+
+        self._update_nav_state(0)
+        return bar
 
     def _update_nav_state(self, active_index):
         for idx, btn in enumerate(self._nav_buttons):
             is_active = (idx == active_index)
             btn.setChecked(is_active)
             icon_name = self._nav_items[idx][0]
-            btn.setIcon(make_icon(icon_name, "#4F46E5" if is_active else "#6B7280", 19))
+            btn.setIcon(make_icon(icon_name, "#38BDF8" if is_active else "#64748B", 18))
 
     def _switch_page(self, nav_index):
         self._update_nav_state(nav_index)
         stack_index = self._nav_items[nav_index][2]
         self.stack.setCurrentIndex(stack_index)
-        if stack_index == 2:
+        if stack_index == 3:
             self.profile_page.refresh()
-        elif stack_index == 3:
-            self.settings_page.refresh()
         elif stack_index == 4:
+            self.settings_page.refresh()
+        elif stack_index == 5:
             self.manage_page.refresh_all()
+        elif stack_index == 6:
+            self.dashboard_page._draw_rating_chart()
 
     def _logout(self):
         if QMessageBox.question(self, "退出登录", "确定退出当前账号？") == QMessageBox.Yes:

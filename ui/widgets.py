@@ -1,42 +1,43 @@
 # -*- coding: utf-8 -*-
 """
 通用界面组件
-包含矢量图标生成、自绘精装电影海报、自适应流式布局、电影卡片及矢量五星评分控件。
+无边框影院海报墙卡片（Apple TV+ 风格）、矢量图标、流式布局与悬停矢量五星控件。
 """
 import math
 
 from PyQt5.QtCore import QPoint, QPointF, QRect, QRectF, QSize, Qt, pyqtSignal
 from PyQt5.QtGui import (QColor, QFont, QIcon, QLinearGradient, QPainter,
-                         QPainterPath, QPen, QPixmap, QPolygonF)
-from PyQt5.QtWidgets import (QFrame, QGraphicsDropShadowEffect, QHBoxLayout,
-                             QLabel, QLayout, QVBoxLayout, QWidget)
+                         QPainterPath, QPen, QPixmap, QPolygonF,
+                         QRadialGradient)
+from PyQt5.QtWidgets import (QFrame, QGraphicsDropShadowEffect, QLabel,
+                             QLayout, QVBoxLayout, QWidget)
 
 
-def apply_shadow(widget, blur=20, y_offset=4, alpha=16):
-    """为卡片添加轻盈柔和的阴影。"""
+def apply_shadow(widget, blur=24, y_offset=6, alpha=60):
+    """保留统一阴影辅助接口（暗色面板下采用克制微投影）。"""
     shadow = QGraphicsDropShadowEffect(widget)
     shadow.setBlurRadius(blur)
     shadow.setOffset(0, y_offset)
-    shadow.setColor(QColor(15, 23, 42, alpha))
+    shadow.setColor(QColor(0, 0, 0, alpha))
     widget.setGraphicsEffect(shadow)
 
 
 def harmonize_color(color_hex):
-    """将普通类型颜色柔化并加深为更有质感的高级出版色调。"""
-    c = QColor(color_hex or "#4F46E5")
+    """将类型颜色调制成沉稳的影院级配色。"""
+    c = QColor(color_hex or "#6366F1")
     if not c.isValid():
-        c = QColor("#4F46E5")
+        c = QColor("#6366F1")
     h = c.hueF()
     s = c.saturationF()
     if h < 0:
-        return QColor("#475569"), QColor("#1E293B")
-    top = QColor.fromHslF(h, min(max(s, 0.35), 0.62), 0.46)
-    bottom = QColor.fromHslF(h, min(max(s, 0.42), 0.68), 0.28)
+        return QColor("#334155"), QColor("#0F172A")
+    top = QColor.fromHslF(h, min(max(s, 0.38), 0.62), 0.36)
+    bottom = QColor.fromHslF(h, min(max(s, 0.44), 0.68), 0.14)
     return top, bottom
 
 
-def make_icon(name, color="#4B5563", size=20):
-    """使用 QPainter 绘制高清矢量单色图标（支持高分屏）。"""
+def make_icon(name, color="#94A3B8", size=20):
+    """使用 QPainter 绘制高清矢量单色图标。"""
     dpr = 2
     pm = QPixmap(size * dpr, size * dpr)
     pm.setDevicePixelRatio(dpr)
@@ -61,6 +62,14 @@ def make_icon(name, color="#4B5563", size=20):
         p.drawLine(QPointF(s * 0.78, s * 0.16), QPointF(s * 0.78, s * 0.34))
         p.drawLine(QPointF(s * 0.69, s * 0.25), QPointF(s * 0.87, s * 0.25))
 
+    elif name == "bot":
+        p.drawRoundedRect(QRectF(s * 0.16, s * 0.26, s * 0.68, s * 0.52), 4.0, 4.0)
+        p.drawLine(QPointF(s * 0.50, s * 0.12), QPointF(s * 0.50, s * 0.26))
+        p.drawEllipse(QRectF(s * 0.45, s * 0.08, s * 0.10, s * 0.10))
+        p.drawEllipse(QRectF(s * 0.31, s * 0.43, s * 0.10, s * 0.10))
+        p.drawEllipse(QRectF(s * 0.59, s * 0.43, s * 0.10, s * 0.10))
+        p.drawLine(QPointF(s * 0.36, s * 0.64), QPointF(s * 0.64, s * 0.64))
+
     elif name == "search":
         p.drawEllipse(QRectF(s * 0.16, s * 0.16, s * 0.52, s * 0.52))
         p.drawLine(QPointF(s * 0.62, s * 0.62), QPointF(s * 0.84, s * 0.84))
@@ -84,8 +93,11 @@ def make_icon(name, color="#4B5563", size=20):
         ]))
 
     elif name == "movie":
-        p.drawRoundedRect(QRectF(s * 0.2, s * 0.15, s * 0.6, s * 0.7), 2.5, 2.5)
-        p.drawLine(QPointF(s * 0.36, s * 0.15), QPointF(s * 0.36, s * 0.85))
+        p.drawRoundedRect(QRectF(s * 0.15, s * 0.2, s * 0.7, s * 0.6), 2.5, 2.5)
+        p.drawLine(QPointF(s * 0.32, s * 0.2), QPointF(s * 0.32, s * 0.8))
+        p.drawLine(QPointF(s * 0.68, s * 0.2), QPointF(s * 0.68, s * 0.8))
+        p.drawLine(QPointF(s * 0.15, s * 0.5), QPointF(s * 0.32, s * 0.5))
+        p.drawLine(QPointF(s * 0.68, s * 0.5), QPointF(s * 0.85, s * 0.5))
 
     elif name == "users":
         p.drawEllipse(QRectF(s * 0.32, s * 0.18, s * 0.28, s * 0.28))
@@ -155,6 +167,12 @@ def make_icon(name, color="#4B5563", size=20):
             outer = QPointF(s * 0.5 + s * 0.30 * math.cos(ang), s * 0.5 + s * 0.30 * math.sin(ang))
             p.drawLine(inner, outer)
 
+    elif name == "chart-bar":
+        p.drawLine(QPointF(s * 0.16, s * 0.82), QPointF(s * 0.84, s * 0.82))
+        p.drawRoundedRect(QRectF(s * 0.22, s * 0.48, s * 0.14, s * 0.34), 2.0, 2.0)
+        p.drawRoundedRect(QRectF(s * 0.43, s * 0.22, s * 0.14, s * 0.60), 2.0, 2.0)
+        p.drawRoundedRect(QRectF(s * 0.64, s * 0.36, s * 0.14, s * 0.46), 2.0, 2.0)
+
     p.end()
     return QIcon(pm)
 
@@ -184,9 +202,9 @@ def populate_grid(grid_layout, cards, columns=4):
 
 
 class FlowLayout(QLayout):
-    """响应式流式布局，随容器宽度自动换行排列卡片。"""
+    """响应式流式布局，随容器宽度自动换行排列。"""
 
-    def __init__(self, parent=None, margin=0, h_spacing=18, v_spacing=18):
+    def __init__(self, parent=None, margin=0, h_spacing=20, v_spacing=22):
         super().__init__(parent)
         self._items = []
         self._h_space = h_spacing
@@ -257,13 +275,13 @@ class FlowLayout(QLayout):
 
 
 class FlowContainer(QWidget):
-    """配合 QScrollArea 使用的流式容器，确保滚动高度随宽度动态更新。"""
+    """配合 QScrollArea 或常规布局使用的流式容器。"""
 
-    def __init__(self, h_spacing=18, v_spacing=18, parent=None):
+    def __init__(self, h_spacing=20, v_spacing=22, margin=2, parent=None):
         super().__init__(parent)
         self.setObjectName("flowContainer")
         self.setStyleSheet("QWidget#flowContainer { background: transparent; }")
-        self.flow = FlowLayout(self, margin=2, h_spacing=h_spacing, v_spacing=v_spacing)
+        self.flow = FlowLayout(self, margin=margin, h_spacing=h_spacing, v_spacing=v_spacing)
 
     def hasHeightForWidth(self):
         return True
@@ -273,20 +291,28 @@ class FlowContainer(QWidget):
 
 
 class MoviePoster(QWidget):
-    """使用 QPainter 绘制的精装电影海报。"""
+    """2:3 纯净影院级海报（支持悬浮高亮边框、TMDB 评分浮标、推荐契合度浮标）。"""
 
-    def __init__(self, movie, radius=10, large=False, parent=None):
+    def __init__(self, movie, radius=12, large=False, score=None, parent=None):
         super().__init__(parent)
         self.movie = movie
         self.radius = radius
         self.large = large
+        self.score = score
+        self._hovered = False
         self._pixmap = None
         self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         self._load_online()
 
+    def set_hovered(self, hovered):
+        if self._hovered != hovered:
+            self._hovered = hovered
+            self.update()
+
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
+        p.setRenderHint(QPainter.SmoothPixmapTransform)
         w, h = float(self.width()), float(self.height())
         rect = QRectF(0, 0, w, h)
 
@@ -295,75 +321,89 @@ class MoviePoster(QWidget):
         p.setClipPath(clip)
 
         if self._pixmap is not None and not self._pixmap.isNull():
-            p.drawPixmap(QRectF(0, 0, w, h), self._pixmap, self._source_rect(w, h))
-            p.end()
-            return
+            p.drawPixmap(rect, self._pixmap, self._source_rect(w, h))
+            vignette = QLinearGradient(0, 0, 0, h)
+            vignette.setColorAt(0.0, QColor(0, 0, 0, 55))
+            vignette.setColorAt(0.30, QColor(0, 0, 0, 0))
+            vignette.setColorAt(0.74, QColor(0, 0, 0, 0))
+            vignette.setColorAt(1.0, QColor(0, 0, 0, 115))
+            p.fillRect(rect, vignette)
+        else:
+            self._paint_fallback(p, w, h, rect)
 
+        # 左上角：推荐契合度角标
+        if self.score is not None and self.score > 0 and not self.large:
+            txt = f"{int(round(min(1.0, self.score) * 100))}% 匹配" if self.score <= 1.0 else f"★ {self.score:.2f}"
+            f = QFont("Microsoft YaHei UI", 8)
+            f.setBold(True)
+            p.setFont(f)
+            bw = p.fontMetrics().horizontalAdvance(txt) + 14
+            b_rect = QRectF(8, 8, bw, 22)
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(2, 132, 199, 230))
+            p.drawRoundedRect(b_rect, 6, 6)
+            p.setPen(QColor("#FFFFFF"))
+            p.drawText(b_rect, Qt.AlignCenter, txt)
+
+        # 右上角：TMDB 评分角标
+        vote = getattr(self.movie, "vote_average", 0) or 0
+        if vote > 0 and not self.large:
+            txt = f"★ {vote:.1f}"
+            f = QFont("Microsoft YaHei UI", 8)
+            f.setBold(True)
+            p.setFont(f)
+            bw = p.fontMetrics().horizontalAdvance(txt) + 12
+            b_rect = QRectF(w - bw - 8, 8, bw, 22)
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(7, 9, 14, 205))
+            p.drawRoundedRect(b_rect, 6, 6)
+            p.setPen(QColor("#FBBF24"))
+            p.drawText(b_rect, Qt.AlignCenter, txt)
+
+        # 边框（平时极细冷灰玻璃描边，悬停亮起冰川青蓝轮廓光）
+        p.setBrush(Qt.NoBrush)
+        if self._hovered:
+            p.setPen(QPen(QColor("#38BDF8"), 2.5))
+            p.drawRoundedRect(rect.adjusted(1.2, 1.2, -1.2, -1.2), self.radius, self.radius)
+        else:
+            p.setPen(QPen(QColor(148, 163, 184, 28), 1.0))
+            p.drawRoundedRect(rect.adjusted(0.5, 0.5, -0.5, -0.5), self.radius, self.radius)
+        p.end()
+
+    def _paint_fallback(self, p, w, h, rect):
         top_c, bot_c = harmonize_color(self.movie.poster_color)
-        grad = QLinearGradient(0, 0, w, h)
+        grad = QLinearGradient(0, 0, 0, h)
         grad.setColorAt(0.0, top_c)
         grad.setColorAt(1.0, bot_c)
         p.fillRect(rect, grad)
 
-        seed = sum(ord(ch) for ch in (self.movie.title or "Movie"))
-        p.setPen(Qt.NoPen)
-        p.setBrush(QColor(255, 255, 255, 20))
-        if seed % 3 == 0:
-            p.drawEllipse(QPointF(w * 0.88, h * 0.18), w * 0.42, w * 0.42)
-            p.setBrush(QColor(255, 255, 255, 12))
-            p.drawEllipse(QPointF(w * 0.15, h * 0.85), w * 0.35, w * 0.35)
-        elif seed % 3 == 1:
-            p.drawEllipse(QPointF(w * 0.5, h * 0.96), w * 0.6, w * 0.6)
-            p.setPen(QPen(QColor(255, 255, 255, 22), 1.2))
-            p.setBrush(Qt.NoBrush)
-            p.drawEllipse(QPointF(w * 0.82, h * 0.22), w * 0.28, w * 0.28)
-        else:
-            p.drawRoundedRect(QRectF(w * 0.52, -h * 0.08, w * 0.65, h * 0.65), 24, 24)
-            p.setBrush(QColor(255, 255, 255, 12))
-            p.drawEllipse(QPointF(w * 0.22, h * 0.78), w * 0.28, w * 0.28)
+        spot = QRadialGradient(QPointF(w * 0.5, h * 0.24), w * 0.8)
+        spot.setColorAt(0.0, QColor(255, 255, 255, 40))
+        spot.setColorAt(1.0, QColor(255, 255, 255, 0))
+        p.fillRect(rect, spot)
 
-        spine_w = 10.0 if self.large else 8.0
-        p.setPen(Qt.NoPen)
-        p.setBrush(QColor(15, 23, 42, 48))
-        p.drawRect(QRectF(0, 0, spine_w, h))
-        p.setBrush(QColor(255, 255, 255, 42))
-        p.drawRect(QRectF(spine_w, 0, 1.5, h))
+        p.setPen(QPen(QColor(255, 255, 255, 28), 1.0))
+        p.setBrush(Qt.NoBrush)
+        p.drawRoundedRect(QRectF(10, 10, w - 20, h - 20), max(4, self.radius - 4), max(4, self.radius - 4))
 
-        cat = self.movie.genre or "其他"
-        font_cat = QFont("Microsoft YaHei UI", 8 if not self.large else 9)
-        font_cat.setBold(True)
-        p.setFont(font_cat)
-        fm = p.fontMetrics()
-        pill_w = min(fm.horizontalAdvance(cat) + 16, w - spine_w - 28)
-        pill_rect = QRectF(spine_w + 14, 14, pill_w, 20 if not self.large else 22)
-        p.setBrush(QColor(255, 255, 255, 36))
-        p.drawRoundedRect(pill_rect, 6, 6)
-        p.setPen(QColor(255, 255, 255, 235))
-        p.drawText(pill_rect, Qt.AlignCenter, cat)
+        f_title = QFont("Microsoft YaHei UI", 12 if not self.large else 15)
+        f_title.setBold(True)
+        p.setFont(f_title)
+        p.setPen(QColor(255, 255, 255, 245))
+        title_rect = QRectF(16, 44, w - 32, h - 92)
+        p.drawText(title_rect, Qt.AlignCenter | Qt.TextWordWrap, self.movie.title)
 
-        title_font = QFont("Microsoft YaHei UI", 12 if not self.large else 14)
-        title_font.setBold(True)
-        p.setFont(title_font)
-        p.setPen(QColor(255, 255, 255, 248))
-        title_rect = QRectF(spine_w + 14, 46 if not self.large else 54,
-                            w - spine_w - 26, h - (90 if not self.large else 104))
-        p.drawText(title_rect, Qt.AlignLeft | Qt.AlignVCenter | Qt.TextWordWrap, self.movie.title)
-
-        line_y = h - (36 if not self.large else 42)
-        p.setPen(QPen(QColor(255, 255, 255, 110), 1.5))
-        p.drawLine(QPointF(spine_w + 14, line_y), QPointF(spine_w + 42, line_y))
-
-        director_font = QFont("Microsoft YaHei UI", 8 if not self.large else 9)
-        p.setFont(director_font)
-        p.setPen(QColor(255, 255, 255, 200))
-        director_rect = QRectF(spine_w + 14, line_y + 6, w - spine_w - 26, 20)
-        elided_director = p.fontMetrics().elidedText(self.movie.director or "未知", Qt.ElideRight, int(director_rect.width()))
-        p.drawText(director_rect, Qt.AlignLeft | Qt.AlignVCenter, elided_director)
-
-        p.end()
+        year = getattr(self.movie, "release_year", None)
+        sub_text = f"{self.movie.director or ''} · {year}" if year else (self.movie.director or "")
+        if sub_text.strip(" ·"):
+            f_sub = QFont("Microsoft YaHei UI", 8 if not self.large else 9)
+            p.setFont(f_sub)
+            p.setPen(QColor(255, 255, 255, 185))
+            sub_rect = QRectF(16, h - 38, w - 32, 20)
+            elided = p.fontMetrics().elidedText(sub_text.strip(" ·"), Qt.ElideRight, int(sub_rect.width()))
+            p.drawText(sub_rect, Qt.AlignCenter, elided)
 
     def _load_online(self):
-        """异步加载在线海报；失败或离线时沿用绘制海报。"""
         url = getattr(self.movie, "poster_url", "") or ""
         if not url:
             return
@@ -380,7 +420,6 @@ class MoviePoster(QWidget):
         self.update()
 
     def _source_rect(self, w, h):
-        """计算海报居中裁剪的源区域，保持纵横比。"""
         pw = float(self._pixmap.width())
         ph = float(self._pixmap.height())
         if pw <= 0 or ph <= 0:
@@ -395,58 +434,59 @@ class MoviePoster(QWidget):
 
 
 class MovieCard(QFrame):
-    """现代电影卡片控件，点击后发出 clicked(Movie) 信号。"""
+    """无边框极简流媒体海报卡片（纯净 2:3 海报 + 下方克制双行排版）。"""
     clicked = pyqtSignal(object)
 
-    def __init__(self, movie, score=None, parent=None):
+    def __init__(self, movie, score=None, compact=False, parent=None):
         super().__init__(parent)
         self.movie = movie
+        self.compact = compact
         self.setObjectName("movieCard")
-        self.setFixedSize(212, 312)
+        if compact:
+            self.setFixedSize(166, 294)
+        else:
+            self.setFixedSize(188, 336)
         self.setCursor(Qt.PointingHandCursor)
-        apply_shadow(self, blur=20, y_offset=4, alpha=14)
         self._build(score)
 
     def _build(self, score):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
-        cover = MoviePoster(self.movie, radius=10)
-        cover.setFixedHeight(178)
+        self.poster = MoviePoster(self.movie, radius=12, score=score)
+        self.poster.setFixedHeight(238 if self.compact else 274)
 
         title = QLabel(self.movie.title)
         title.setObjectName("cardTitle")
-        title.setWordWrap(True)
-        title.setMaximumHeight(42)
-        title.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        title.setWordWrap(False)
+        title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        # 用 QFontMetrics 省略超长片名，保持整行视觉整齐
+        fm = title.fontMetrics()
+        max_w = 160 if self.compact else 184
+        title.setText(fm.elidedText(self.movie.title or "", Qt.ElideRight, max_w))
 
-        director = QLabel(self.movie.director or "未知")
-        director.setObjectName("cardAuthor")
+        year = getattr(self.movie, "release_year", None)
+        genre = (self.movie.genre or "电影").split("/")[0]
+        meta_text = f"{year} · {genre}" if year else genre
+        meta = QLabel(meta_text)
+        meta.setObjectName("cardMeta")
 
-        bottom = QHBoxLayout()
-        bottom.setContentsMargins(0, 2, 0, 0)
-        bottom.setSpacing(6)
-
-        cat_pill = QLabel(self.movie.genre or "其他")
-        cat_pill.setObjectName("catPill")
-        bottom.addWidget(cat_pill)
-        bottom.addStretch()
-
-        if score is not None and score > 0:
-            match_pill = QLabel(f"推荐 {score:.2f}")
-            match_pill.setObjectName("matchPill")
-            bottom.addWidget(match_pill)
-            match_pill.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-
-        layout.addWidget(cover)
+        layout.addWidget(self.poster)
         layout.addWidget(title)
-        layout.addWidget(director)
+        layout.addWidget(meta)
         layout.addStretch()
-        layout.addLayout(bottom)
 
-        for w in (title, director, cat_pill):
+        for w in (title, meta):
             w.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+
+    def enterEvent(self, event):
+        self.poster.set_hovered(True)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.poster.set_hovered(False)
+        super().leaveEvent(event)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -455,7 +495,7 @@ class MovieCard(QFrame):
 
 
 class StarRating(QWidget):
-    """支持悬停预览的矢量五星评分控件。"""
+    """暗色主题下的矢量五星评分控件（支持悬停预览）。"""
     rating_changed = pyqtSignal(int)
 
     LABELS = {
@@ -532,10 +572,10 @@ class StarRating(QWidget):
             if i <= active:
                 fill = QColor("#F59E0B") if self.hover_score == 0 or i <= self.score else QColor("#FBBF24")
                 p.setBrush(fill)
-                p.setPen(QPen(QColor("#D97706"), 1.0))
+                p.setPen(QPen(QColor("#F59E0B"), 1.0))
             else:
-                p.setBrush(QColor("#E5E7EB"))
-                p.setPen(QPen(QColor("#D1D5DB"), 1.0))
+                p.setBrush(QColor("#23283B"))
+                p.setPen(QPen(QColor("#363E5C"), 1.0))
             p.drawPolygon(QPolygonF(pts))
 
         text_x = 5 * (self.star_size + self.gap) + 10
@@ -543,6 +583,6 @@ class StarRating(QWidget):
         font = QFont("Microsoft YaHei UI", 10)
         font.setBold(active > 0)
         p.setFont(font)
-        p.setPen(QColor("#D97706") if active > 0 else QColor("#6B7280"))
+        p.setPen(QColor("#FBBF24") if active > 0 else QColor("#64748B"))
         p.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, self.LABELS.get(active, f"{active} 分"))
         p.end()

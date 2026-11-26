@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 混合推荐算法（Hybrid Recommendation）
-将内容推荐、物品协同过滤、用户协同过滤三类结果按权重融合，
-兼顾“内容相似”“物品关联”与“群体偏好”三个维度。
 """
 import config
 from utils.logger import get_logger
@@ -11,13 +9,16 @@ logger = get_logger("recommender.hybrid")
 
 
 def _normalize(pairs):
-    """将 [(movie, score)] 的分数做最小-最大归一化到 [0, 1]。"""
+    """将 [(movie, score)] 归一化到 [0, 1]。"""
     if not pairs:
         return []
     values = [s for _, s in pairs]
     lo, hi = min(values), max(values)
     if hi - lo < 1e-9:
-        return [(b, 1.0) for b, _ in pairs]
+        # 仅 1 条或分数完全一致时，按量纲合理缩放（CF 1~5 分按 /5，相似度保持原值）
+        val = values[0]
+        scaled = min(1.0, max(0.0, val / 5.0 if val > 1.0 else val))
+        return [(b, scaled) for b, _ in pairs]
     return [(b, (s - lo) / (hi - lo)) for b, s in pairs]
 
 
@@ -30,25 +31,27 @@ class HybridRecommender:
         self.user_cf_weight = user_cf_weight if user_cf_weight is not None else config.HYBRID_USER_CF_WEIGHT
 
     def combine(self, content_results, collab_results, top_n=None):
-        """兼容旧接口：collab_results 视为物品协同过滤结果。"""
         return self.combine3(content_results, collab_results, [], top_n)
 
     def combine3(self, content_results, item_cf_results, user_cf_results, top_n=None):
-        """融合三类推荐结果，返回 [(Movie, score)]。"""
+        """按有效分支权重动态归一化融合三类推荐结果，返回 [(Movie, score)]。"""
         top_n = top_n or config.HYBRID_TOP_N
-        total = self.content_weight + self.item_cf_weight + self.user_cf_weight
-        if total <= 0:
-            total = 1.0
+        active = [
+            (pairs, weight)
+            for pairs, weight in [
+                (content_results, self.content_weight),
+                (item_cf_results, self.item_cf_weight),
+                (user_cf_results, self.user_cf_weight),
+            ]
+            if pairs and weight > 0
+        ]
+        if not active:
+            return []
 
+        total = sum(w for _, w in active)
         scores = {}
         movie_map = {}
-        for pairs, weight in [
-            (content_results, self.content_weight),
-            (item_cf_results, self.item_cf_weight),
-            (user_cf_results, self.user_cf_weight),
-        ]:
-            if weight <= 0:
-                continue
+        for pairs, weight in active:
             for movie, s in _normalize(pairs):
                 scores[movie.id] = scores.get(movie.id, 0.0) + (weight / total) * s
                 movie_map[movie.id] = movie

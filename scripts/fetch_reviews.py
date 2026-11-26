@@ -2,40 +2,47 @@
 """
 抓取 TMDB 真实影评（中文优先，无则英文兜底）
 用法：python -m scripts.fetch_reviews
-会清空 reviews 表，按电影重新抓取，每部最多保留 LIMIT 条。
 """
 import argparse
-import json
-import time
-import urllib.parse
-import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import config
 from db.connection import execute_query, execute_update
 from db.init_db import init_database
+from services.tmdb_service import tmdb_get
 from utils.logger import get_logger
 
 logger = get_logger("scripts.reviews")
 
-API = "https://api.themoviedb.org/3"
 
+def _fetch_reviews_for_movie(movie, limit):
+    results = []
+    for lang in ("zh-CN", "en-US"):
+        try:
+            data = tmdb_get(f"/movie/{movie['tmdb_id']}/reviews", {"page": 1}, language=lang)
+            results = data.get("results") or []
+            if results:
+                break
+        except Exception:  # noqa: BLE001
+            continue
 
-def _get(path, params):
-    params = dict(params)
-    params["api_key"] = config.TMDB_API_KEY
-    url = API + path + "?" + urllib.parse.urlencode(params)
-    req = urllib.request.Request(url, headers={"User-Agent": "Recomind/1.0"})
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        return json.loads(resp.read().decode("utf-8"))
-
-
-def _reviews(tmdb_id, language):
-    try:
-        data = _get(f"/movie/{tmdb_id}/reviews", {"language": language, "page": 1})
-        return data.get("results") or []
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("获取影评失败 %s: %s", tmdb_id, exc)
-        return []
+    picked = []
+    seen = set()
+    for r in results:
+        content = (r.get("content") or "").strip()
+        if not content or content in seen:
+            continue
+        seen.add(content)
+        picked.append({
+            "movie_id": movie["id"],
+            "author": r.get("author") or "匿名",
+            "content": content[:1200],
+            "rating": (r.get("author_details") or {}).get("rating") or 0,
+            "created_at": (r.get("created_at") or "")[:19],
+        })
+        if len(picked) >= limit:
+            break
+    return picked
 
 
 def fetch_all(limit=5):
@@ -51,40 +58,24 @@ def fetch_all(limit=5):
 
     total = 0
     covered = 0
-    for idx, movie in enumerate(movies, 1):
-        results = _reviews(movie["tmdb_id"], "zh-CN")
-        if not results:
-            results = _reviews(movie["tmdb_id"], config.TMDB_LANGUAGE)
-        if not results:
-            results = _reviews(movie["tmdb_id"], "en-US")
-
-        picked = 0
-        seen = set()
-        for review in results:
-            content = (review.get("content") or "").strip()
-            if not content or content in seen:
-                continue
-            seen.add(content)
-            execute_update(
-                "INSERT INTO reviews (movie_id, author, content, rating, created_at) "
-                "VALUES (%s,%s,%s,%s,%s)",
-                (
-                    movie["id"],
-                    review.get("author") or "匿名",
-                    content[:1200],
-                    (review.get("author_details") or {}).get("rating") or 0,
-                    (review.get("created_at") or "")[:19],
-                ),
-            )
-            picked += 1
-            total += 1
-            if picked >= limit:
-                break
-        if picked:
-            covered += 1
-        if idx % 20 == 0:
-            print(f"进度 {idx}/{len(movies)}，影评 {total} 条")
-        time.sleep(0.12)
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        futures = [pool.submit(_fetch_reviews_for_movie, m, limit) for m in movies]
+        for idx, fut in enumerate(as_completed(futures), 1):
+            try:
+                items = fut.result()
+                if items:
+                    covered += 1
+                    for rv in items:
+                        execute_update(
+                            "INSERT INTO reviews (movie_id, author, content, rating, created_at) "
+                            "VALUES (%s,%s,%s,%s,%s)",
+                            (rv["movie_id"], rv["author"], rv["content"], rv["rating"], rv["created_at"]),
+                        )
+                        total += 1
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("抓取影评失败: %s", exc)
+            if idx % 50 == 0:
+                print(f"进度 {idx}/{len(movies)}，影评 {total} 条")
 
     print(f"完成：影评 {total} 条，覆盖 {covered}/{len(movies)} 部电影")
 

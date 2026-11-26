@@ -1,8 +1,26 @@
-# Recomind 智能推荐系统 - 依赖清单
+# Recomind 智能推荐系统 v2.0 - 依赖清单
 # 安装命令：pip install -r requirements.txt
+#
+# ===== 核心框架 =====
 PyQt5>=5.15.0          # 桌面图形界面
 PyMySQL>=1.1.0         # MySQL 数据库驱动
 cryptography>=42.0.0   # MySQL 8 密码认证所需
+
+# ===== NLP 与机器学习（核心） =====
 jieba>=0.42.1          # 中文分词
-scikit-learn>=1.4.0    # TF-IDF、余弦相似度等机器学习算法
+scikit-learn>=1.4.0    # TF-IDF、SVD、LDA、余弦相似度等
 numpy>=1.26.0          # 数值计算
+
+# ===== 新增：语义嵌入（v2.0 核心升级） =====
+sentence-transformers>=2.6.0  # Sentence-BERT 多语言语义嵌入
+# 注意：首次运行会自动下载 ~120MB 的预训练模型
+# 若无法联网，系统将自动降级为 TF-IDF+SVD (LSA) 语义压缩
+
+# ===== 新增：情感分析（v2.0 新增） =====
+snownlp>=0.12.3        # 中文情感分析（可选，不安装则降级规则词典）
+
+# ===== 新增：数据可视化（v2.0 仪表盘） =====
+matplotlib>=3.8.0      # 雷达图、柱状图、直方图嵌入 Qt 界面
+
+# ===== 工具库 =====
+requests>=2.31.0       # TMDB API 请求（已有）

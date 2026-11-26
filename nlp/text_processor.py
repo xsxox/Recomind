@@ -10,16 +10,14 @@ import jieba
 
 import config
 
-# 停用词集合（惰性加载 + 内存缓存）
 _stopwords = None
 
-# 内置基础停用词，与 data/stopwords.txt 合并使用
 _BUILTIN_STOPWORDS = {
     "的", "了", "和", "是", "在", "就", "都", "而", "及", "与", "着", "或",
     "一个", "没有", "我们", "你们", "他们", "它们", "这个", "那个", "这些",
     "那些", "自己", "什么", "可以", "非常", "比较", "但是", "因为", "所以",
     "如果", "虽然", "然而", "而且", "因此", "对于", "关于", "通过", "作为",
-    "进行", "已经", "以及", "等", "等等", "之一", "一种", "本书", "本书", "内容",
+    "进行", "已经", "以及", "等", "等等", "之一", "一种", "电影", "影片",
 }
 
 
@@ -43,12 +41,11 @@ def load_stopwords():
 
 
 def clean_text(text):
-    """清洗文本：统一小写、去除数字与标点符号，仅保留中英文。"""
+    """清洗文本：统一小写、去除标点符号，保留中英文与数字。"""
     if not text:
         return ""
     text = text.lower()
-    text = re.sub(r"[0-9]+", " ", text)
-    text = re.sub(r"[^\u4e00-\u9fa5a-zA-Z]+", " ", text)
+    text = re.sub(r"[^\u4e00-\u9fa5a-zA-Z0-9]+", " ", text)
     return " ".join(text.split())
 
 
@@ -57,10 +54,14 @@ def tokenize(text, remove_stopwords=True):
     text = clean_text(text)
     if not text:
         return []
-    words = [w.strip() for w in jieba.lcut(text) if w.strip()]
-    if remove_stopwords:
-        stop = load_stopwords()
-        words = [w for w in words if w not in stop and len(w) > 1]
+    raw_words = [w.strip() for w in jieba.lcut(text) if w.strip()]
+    if not remove_stopwords:
+        return raw_words
+    stop = load_stopwords()
+    words = [w for w in raw_words if w not in stop and len(w) > 1]
+    # 若全为单字有效词（如搜“猫”、“爱”），回退保留非停用单字
+    if not words:
+        words = [w for w in raw_words if w not in stop]
     return words
 
 

@@ -10,7 +10,7 @@ logger = get_logger("services.setting")
 
 DEFAULTS = {
     "preferred_genres": "",
-    "recommend_top_n": 12,
+    "recommend_top_n": 80,
     "enable_content": True,
     "enable_item_cf": True,
     "enable_user_cf": True,
@@ -25,18 +25,20 @@ class SettingService:
         if not rows:
             return dict(DEFAULTS)
         r = rows[0]
+        raw_top = int(r.get("recommend_top_n") or DEFAULTS["recommend_top_n"])
         return {
             "preferred_genres": r.get("preferred_genres") or "",
-            "recommend_top_n": r.get("recommend_top_n") or DEFAULTS["recommend_top_n"],
+            "recommend_top_n": max(20, min(200, raw_top if raw_top >= 20 else DEFAULTS["recommend_top_n"])),
             "enable_content": bool(r.get("enable_content", 1)),
             "enable_item_cf": bool(r.get("enable_item_cf", 1)),
             "enable_user_cf": bool(r.get("enable_user_cf", 1)),
         }
 
-    def save_settings(self, user_id, preferred_genres="", recommend_top_n=12,
+    def save_settings(self, user_id, preferred_genres="", recommend_top_n=80,
                       enable_content=True, enable_item_cf=True, enable_user_cf=True):
+        top_n = max(20, min(200, int(recommend_top_n or DEFAULTS["recommend_top_n"])))
         params = (
-            preferred_genres.strip(), recommend_top_n,
+            (preferred_genres or "").strip(), top_n,
             int(bool(enable_content)), int(bool(enable_item_cf)), int(bool(enable_user_cf)),
         )
         exists = execute_query("SELECT user_id FROM user_settings WHERE user_id=%s", (user_id,))

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 用户服务
-负责用户注册、登录、查询与删除。
+负责用户注册、登录、查询、资料修改与删除。
 """
 from db import models
 from db.connection import execute_query, execute_update
@@ -16,9 +16,12 @@ class UserService:
 
     def register(self, username, password, nickname="", gender="", age=0):
         """注册新用户，成功返回 (user_id, None)，失败返回 (None, 错误信息)。"""
-        username = username.strip()
+        username = (username or "").strip()
+        nickname = (nickname or "").strip()
         if not username or not password:
             return None, "用户名和密码不能为空"
+        if len(username) > 50:
+            return None, "用户名长度不能超过 50 个字符"
         if len(password) < 4:
             return None, "密码长度不能少于 4 位"
 
@@ -40,7 +43,10 @@ class UserService:
 
     def login(self, username, password):
         """登录校验，成功返回 (User, None)，失败返回 (None, 错误信息)。"""
-        rows = execute_query("SELECT * FROM users WHERE username=%s", (username.strip(),))
+        username = (username or "").strip()
+        if not username or not password:
+            return None, "用户名和密码不能为空"
+        rows = execute_query("SELECT * FROM users WHERE username=%s", (username,))
         if not rows:
             return None, "用户不存在"
         user = models.User.from_dict(rows[0])
@@ -64,7 +70,7 @@ class UserService:
         """更新用户资料，返回受影响行数。"""
         rows, _ = execute_update(
             "UPDATE users SET nickname=%s, gender=%s, age=%s WHERE id=%s",
-            (nickname, gender, age, user_id),
+            ((nickname or "").strip(), gender, age, user_id),
         )
         return rows
 

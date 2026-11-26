@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 登录 / 注册对话框
-采用极光艺术分栏视觉 + 现代顶部对齐表单。
+暗夜影院极光视觉分栏 + 极简表单。
 """
 from PyQt5.QtCore import QPointF, QRectF, Qt
 from PyQt5.QtGui import (QColor, QLinearGradient, QPainter, QPen,
@@ -17,7 +17,7 @@ logger = get_logger("ui.login")
 
 
 class HeroArtworkPanel(QFrame):
-    """左侧自绘极光与极简几何视觉面板。"""
+    """左侧影院极光艺术画布。"""
 
     def paintEvent(self, event):
         p = QPainter(self)
@@ -26,24 +26,24 @@ class HeroArtworkPanel(QFrame):
         rect = QRectF(0, 0, w, h)
 
         bg = QLinearGradient(0, 0, w, h)
-        bg.setColorAt(0.0, QColor("#0F172A"))
-        bg.setColorAt(1.0, QColor("#1E1B4B"))
+        bg.setColorAt(0.0, QColor("#07090E"))
+        bg.setColorAt(1.0, QColor("#0B1626"))
         p.fillRect(rect, bg)
 
-        glow1 = QRadialGradient(QPointF(w * 0.2, h * 0.2), w * 0.7)
-        glow1.setColorAt(0.0, QColor(99, 102, 241, 120))
-        glow1.setColorAt(1.0, QColor(99, 102, 241, 0))
-        p.fillRect(rect, glow1)
+        g1 = QRadialGradient(QPointF(w * 0.22, h * 0.22), w * 0.72)
+        g1.setColorAt(0.0, QColor(14, 165, 233, 125))
+        g1.setColorAt(1.0, QColor(14, 165, 233, 0))
+        p.fillRect(rect, g1)
 
-        glow2 = QRadialGradient(QPointF(w * 0.85, h * 0.85), w * 0.65)
-        glow2.setColorAt(0.0, QColor(56, 189, 248, 80))
-        glow2.setColorAt(1.0, QColor(56, 189, 248, 0))
-        p.fillRect(rect, glow2)
+        g2 = QRadialGradient(QPointF(w * 0.85, h * 0.82), w * 0.65)
+        g2.setColorAt(0.0, QColor(6, 182, 212, 70))
+        g2.setColorAt(1.0, QColor(6, 182, 212, 0))
+        p.fillRect(rect, g2)
 
-        p.setPen(QPen(QColor(255, 255, 255, 22), 1.2))
+        p.setPen(QPen(QColor(255, 255, 255, 20), 1.2))
         p.setBrush(Qt.NoBrush)
-        p.drawEllipse(QPointF(w * 0.86, h * 0.16), 110, 110)
-        p.drawEllipse(QPointF(w * 0.86, h * 0.16), 165, 165)
+        p.drawEllipse(QPointF(w * 0.84, h * 0.18), 110, 110)
+        p.drawEllipse(QPointF(w * 0.84, h * 0.18), 170, 170)
         p.end()
 
 
@@ -54,7 +54,7 @@ class LoginDialog(QDialog):
         super().__init__(parent)
         self.user_service = UserService()
         self.logged_user = None
-        self.setWindowTitle("登录 - Recomind 智能推荐系统")
+        self.setWindowTitle("登录 - Recomind 智能影库")
         self.resize(900, 580)
         self.setMinimumSize(820, 540)
         self._build()
@@ -73,22 +73,22 @@ class LoginDialog(QDialog):
         layout.setContentsMargins(40, 44, 36, 36)
         layout.setSpacing(16)
 
-        pill = QLabel("NLP · MACHINE LEARNING")
+        pill = QLabel("CINEMA · NLP & ML")
         pill.setStyleSheet(
-            "background-color: rgba(255,255,255,0.12); color: #C7D2FE;"
+            "background-color: rgba(255,255,255,0.10); color: #C7D2FE;"
             "font-size: 11px; font-weight: bold; letter-spacing: 1px;"
             "padding: 6px 12px; border-radius: 12px;"
         )
         layout.addWidget(pill, 0, Qt.AlignLeft)
 
         layout.addSpacing(8)
-        title = QLabel("Recomind\n发现下一部好片")
+        title = QLabel("Recomind\n私人智能影库")
         title.setStyleSheet("color: #FFFFFF; font-size: 28px; font-weight: bold; background: transparent;")
         layout.addWidget(title)
 
         desc = QLabel(
-            "基于自然语言处理（TF-IDF + 余弦相似度）与协同过滤混合算法，"
-            "深度理解文本语义与个人观影偏好。"
+            "融合 TMDB 全片库、影评 NLP 语义分析、协同过滤与 RAG 对话助手，"
+            "每一晚都为你精准挑选值得细品的好电影。"
         )
         desc.setWordWrap(True)
         desc.setStyleSheet("color: #94A3B8; font-size: 14px; background: transparent;")
@@ -96,20 +96,20 @@ class LoginDialog(QDialog):
 
         layout.addStretch()
 
-        demo_lbl = QLabel("一键填充演示账号（密码均为 123456）")
-        demo_lbl.setStyleSheet("color: #CBD5E1; font-size: 13px; font-weight: 500; background: transparent;")
+        demo_lbl = QLabel("一键体验演示账号（密码均为 123456）")
+        demo_lbl.setStyleSheet("color: #CBD5E1; font-size: 13px; background: transparent;")
         layout.addWidget(demo_lbl)
 
         demo_row = QHBoxLayout()
         demo_row.setSpacing(8)
-        for uname, tag in [("alice", "科幻"), ("carol", "剧情"), ("erin", "动作")]:
-            btn = QPushButton(f"{uname} · {tag}")
+        for uname, tag in [("alice", "科幻"), ("carol", "剧情"), ("erin", "动作"), ("admin", "管理")]:
+            btn = QPushButton(f"{uname}·{tag}")
             btn.setCursor(Qt.PointingHandCursor)
             btn.setStyleSheet(
-                "QPushButton { background-color: rgba(255,255,255,0.10); color: #F8FAFC;"
-                "border: 1px solid rgba(255,255,255,0.18); border-radius: 8px;"
-                "padding: 8px 10px; font-size: 13px; font-weight: 500; }"
-                "QPushButton:hover { background-color: rgba(99,102,241,0.55); border-color: #818CF8; }"
+                "QPushButton { background-color: rgba(255,255,255,0.08); color: #F8FAFC;"
+                "border: 1px solid rgba(255,255,255,0.16); border-radius: 8px;"
+                "padding: 8px 8px; font-size: 12px; font-weight: 500; }"
+                "QPushButton:hover { background-color: rgba(14,165,233,0.45); border-color: #38BDF8; }"
             )
             btn.clicked.connect(lambda _c, u=uname: self._fill_demo(u))
             demo_row.addWidget(btn)
@@ -119,12 +119,11 @@ class LoginDialog(QDialog):
     def _build_form_side(self):
         panel = QWidget()
         panel.setObjectName("loginFormPanel")
-        panel.setStyleSheet("QWidget#loginFormPanel { background-color: #FFFFFF; }")
+        panel.setStyleSheet("QWidget#loginFormPanel { background-color: #0B0E16; }")
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(46, 36, 46, 34)
         layout.setSpacing(18)
 
-        # 分段胶囊切换器
         seg = QFrame()
         seg.setObjectName("segmentBox")
         seg_layout = QHBoxLayout(seg)
@@ -164,18 +163,18 @@ class LoginDialog(QDialog):
 
     def _field_label(self, text):
         lbl = QLabel(text)
-        lbl.setStyleSheet("color: #374151; font-size: 13px; font-weight: bold;")
+        lbl.setStyleSheet("color: #CBD5E1; font-size: 13px; font-weight: bold;")
         return lbl
 
     def _build_login_tab(self):
         w = QWidget()
         layout = QVBoxLayout(w)
-        layout.setContentsMargins(0, 12, 0, 0)
+        layout.setContentsMargins(0, 14, 0, 0)
         layout.setSpacing(8)
 
         heading = QLabel("欢迎回来")
-        heading.setStyleSheet("font-size: 22px; font-weight: bold; color: #111827;")
-        sub = QLabel("输入账号信息以进入个性化推荐空间")
+        heading.setStyleSheet("font-size: 22px; font-weight: bold; color: #FFFFFF;")
+        sub = QLabel("输入账号信息开启你的私人观影推荐")
         sub.setObjectName("subText")
         layout.addWidget(heading)
         layout.addWidget(sub)
@@ -197,15 +196,14 @@ class LoginDialog(QDialog):
         layout.addWidget(self.login_password)
 
         layout.addSpacing(20)
-        self.login_btn = QPushButton("登  录")
+        self.login_btn = QPushButton("进入影库")
         self.login_btn.setMinimumHeight(48)
         self.login_btn.setDefault(True)
         self.login_btn.setCursor(Qt.PointingHandCursor)
         self.login_btn.setStyleSheet(
-            "QPushButton { background-color: #4F46E5; color: #FFFFFF; border: none;"
+            "QPushButton { background-color: #6366F1; color: #FFFFFF; border: none;"
             "border-radius: 10px; font-size: 16px; font-weight: bold; }"
-            "QPushButton:hover { background-color: #4338CA; }"
-            "QPushButton:pressed { background-color: #3730A3; }"
+            "QPushButton:hover { background-color: #4F46E5; }"
         )
         self.login_btn.clicked.connect(self._do_login)
         layout.addWidget(self.login_btn)
@@ -226,8 +224,9 @@ class LoginDialog(QDialog):
 
         pw_row = QHBoxLayout()
         pw_row.setSpacing(10)
-        col1 = QVBoxLayout()
+        col1, col2 = QVBoxLayout(), QVBoxLayout()
         col1.setSpacing(4)
+        col2.setSpacing(4)
         col1.addWidget(self._field_label("密码"))
         self.reg_password = QLineEdit()
         self.reg_password.setMinimumHeight(42)
@@ -235,15 +234,12 @@ class LoginDialog(QDialog):
         self.reg_password.setPlaceholderText("设置密码")
         col1.addWidget(self.reg_password)
 
-        col2 = QVBoxLayout()
-        col2.setSpacing(4)
         col2.addWidget(self._field_label("确认密码"))
         self.reg_confirm = QLineEdit()
         self.reg_confirm.setMinimumHeight(42)
         self.reg_confirm.setEchoMode(QLineEdit.Password)
         self.reg_confirm.setPlaceholderText("再次输入")
         col2.addWidget(self.reg_confirm)
-
         pw_row.addLayout(col1)
         pw_row.addLayout(col2)
         layout.addLayout(pw_row)
@@ -256,23 +252,21 @@ class LoginDialog(QDialog):
 
         meta_row = QHBoxLayout()
         meta_row.setSpacing(10)
-        g_col = QVBoxLayout()
+        g_col, a_col = QVBoxLayout(), QVBoxLayout()
         g_col.setSpacing(4)
+        a_col.setSpacing(4)
         g_col.addWidget(self._field_label("性别"))
         self.reg_gender = QComboBox()
         self.reg_gender.setMinimumHeight(42)
         self.reg_gender.addItems(["男", "女", "其他"])
         g_col.addWidget(self.reg_gender)
 
-        a_col = QVBoxLayout()
-        a_col.setSpacing(4)
         a_col.addWidget(self._field_label("年龄"))
         self.reg_age = QSpinBox()
         self.reg_age.setMinimumHeight(42)
         self.reg_age.setRange(1, 120)
         self.reg_age.setValue(20)
         a_col.addWidget(self.reg_age)
-
         meta_row.addLayout(g_col)
         meta_row.addLayout(a_col)
         layout.addLayout(meta_row)
@@ -282,10 +276,9 @@ class LoginDialog(QDialog):
         self.register_btn.setMinimumHeight(46)
         self.register_btn.setCursor(Qt.PointingHandCursor)
         self.register_btn.setStyleSheet(
-            "QPushButton { background-color: #4F46E5; color: #FFFFFF; border: none;"
+            "QPushButton { background-color: #6366F1; color: #FFFFFF; border: none;"
             "border-radius: 10px; font-size: 15px; font-weight: bold; }"
-            "QPushButton:hover { background-color: #4338CA; }"
-            "QPushButton:pressed { background-color: #3730A3; }"
+            "QPushButton:hover { background-color: #4F46E5; }"
         )
         self.register_btn.clicked.connect(self._do_register)
         layout.addWidget(self.register_btn)

@@ -13,7 +13,6 @@ import random
 import sys
 from collections import Counter, defaultdict
 
-# 将项目根目录与 vendor 目录加入模块搜索路径
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 _VENDOR = os.path.join(ROOT, "vendor")
@@ -41,8 +40,8 @@ def load_data():
     return movies, ratings
 
 
-def split_ratings(ratings, ratio, seed, min_train=2):
-    """按用户做随机留出划分，返回 (train_ratings, heldout)。"""
+def split_ratings(ratings, ratio, seed, min_train_pos=2):
+    """按用户做随机留出划分，仅留出正反馈（score >= 4）作为相关测试集。"""
     rng = random.Random(seed)
     by_user = defaultdict(list)
     for r in ratings:
@@ -50,14 +49,17 @@ def split_ratings(ratings, ratio, seed, min_train=2):
 
     train, heldout = [], {}
     for uid, items in by_user.items():
-        if len(items) < 3:
-            train.extend(items)
+        pos = [r for r in items if r["score"] >= 4]
+        neg = [r for r in items if r["score"] < 4]
+        train.extend(neg)
+        if len(pos) <= min_train_pos:
+            train.extend(pos)
             continue
-        rng.shuffle(items)
-        n_hold = max(1, int(round(len(items) * ratio)))
-        n_hold = min(n_hold, len(items) - min_train)
-        hold_items = items[:n_hold]
-        train.extend(items[n_hold:])
+        rng.shuffle(pos)
+        n_hold = max(1, int(round(len(pos) * ratio)))
+        n_hold = min(n_hold, len(pos) - min_train_pos)
+        hold_items = pos[:n_hold]
+        train.extend(pos[n_hold:])
         heldout[uid] = {r["movie_id"] for r in hold_items}
     return train, heldout
 
@@ -78,7 +80,10 @@ def main():
     users = list(heldout.keys())
     print(f"电影 {len(movies)} 部，评分 {len(ratings)} 条，评估用户 {len(users)} 人，Top-K={args.k}")
 
-    content = ContentBasedRecommender(topic_weight=config.TOPIC_WEIGHT).fit(movies)
+    content = ContentBasedRecommender(
+        topic_weight=config.TOPIC_WEIGHT,
+        n_topics=config.LDA_TOPICS,
+    ).fit(movies)
     item_cf = CollaborativeRecommender().fit(movies, train)
     user_cf = UserCFRecommender().fit(movies, train)
     hybrid = HybridRecommender()
@@ -88,7 +93,6 @@ def main():
     for r in train:
         train_by_user[r["user_id"]].append((r["movie_id"], r["score"]))
 
-    # 热门基线：按训练集评分次数降序
     count = Counter(r["movie_id"] for r in train)
     popular_order = [mid for mid, _c in count.most_common()]
 

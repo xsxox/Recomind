@@ -21,16 +21,22 @@ class MovieService:
         rows = execute_query("SELECT * FROM movies WHERE id=%s", (movie_id,))
         return models.Movie.from_dict(rows[0]) if rows else None
 
+    def get_by_tmdb_id(self, tmdb_id):
+        if not tmdb_id:
+            return None
+        rows = execute_query("SELECT * FROM movies WHERE tmdb_id=%s", (tmdb_id,))
+        return models.Movie.from_dict(rows[0]) if rows else None
+
     def search_movies(self, keyword):
-        """按片名/导演/类型/简介模糊搜索。"""
+        """按片名/导演/类型/关键词/简介模糊搜索。"""
         keyword = (keyword or "").strip()
         if not keyword:
             return self.list_movies()
         like = f"%{keyword}%"
         rows = execute_query(
             "SELECT * FROM movies WHERE title LIKE %s OR director LIKE %s "
-            "OR genre LIKE %s OR description LIKE %s ORDER BY id",
-            (like, like, like, like),
+            "OR genre LIKE %s OR keywords LIKE %s OR description LIKE %s ORDER BY id",
+            (like, like, like, like, like),
         )
         return [models.Movie.from_dict(r) for r in rows]
 

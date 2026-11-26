@@ -15,6 +15,7 @@ class RatingService:
 
     def add_or_update_rating(self, user_id, movie_id, score, comment=""):
         """新增或更新评分（同一用户对同一部电影仅保留一条）。"""
+        score = max(1, min(5, int(score)))
         existing = self.get_user_rating(user_id, movie_id)
         if existing:
             rows, _ = execute_update(
@@ -72,11 +73,11 @@ class RatingService:
         return 0.0, 0
 
     def get_popular_movies(self, top_n=10):
-        """按平均分与评分人数返回热门电影 [(movie_id, avg_score, count)]。"""
+        """按贝叶斯平滑分与评分人数返回热门电影 [(movie_id, avg_score, count)]。"""
         rows = execute_query(
             "SELECT movie_id, AVG(score) AS avg_score, COUNT(*) AS cnt "
             "FROM ratings GROUP BY movie_id "
-            "ORDER BY avg_score DESC, cnt DESC LIMIT %s",
+            "ORDER BY (SUM(score) + 3 * 3.5) / (COUNT(*) + 3) DESC, cnt DESC LIMIT %s",
             (top_n,),
         )
         return [(r["movie_id"], round(float(r["avg_score"]), 1), r["cnt"]) for r in rows]
