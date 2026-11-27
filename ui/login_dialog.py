@@ -26,18 +26,18 @@ class HeroArtworkPanel(QFrame):
         rect = QRectF(0, 0, w, h)
 
         bg = QLinearGradient(0, 0, w, h)
-        bg.setColorAt(0.0, QColor("#07090E"))
-        bg.setColorAt(1.0, QColor("#0B1626"))
+        bg.setColorAt(0.0, QColor("#080B0C"))
+        bg.setColorAt(1.0, QColor("#0C191A"))
         p.fillRect(rect, bg)
 
         g1 = QRadialGradient(QPointF(w * 0.22, h * 0.22), w * 0.72)
-        g1.setColorAt(0.0, QColor(14, 165, 233, 125))
-        g1.setColorAt(1.0, QColor(14, 165, 233, 0))
+        g1.setColorAt(0.0, QColor(45, 212, 191, 115))
+        g1.setColorAt(1.0, QColor(45, 212, 191, 0))
         p.fillRect(rect, g1)
 
         g2 = QRadialGradient(QPointF(w * 0.85, h * 0.82), w * 0.65)
-        g2.setColorAt(0.0, QColor(6, 182, 212, 70))
-        g2.setColorAt(1.0, QColor(6, 182, 212, 0))
+        g2.setColorAt(0.0, QColor(14, 165, 233, 65))
+        g2.setColorAt(1.0, QColor(14, 165, 233, 0))
         p.fillRect(rect, g2)
 
         p.setPen(QPen(QColor(255, 255, 255, 20), 1.2))
@@ -109,7 +109,7 @@ class LoginDialog(QDialog):
                 "QPushButton { background-color: rgba(255,255,255,0.08); color: #F8FAFC;"
                 "border: 1px solid rgba(255,255,255,0.16); border-radius: 8px;"
                 "padding: 8px 8px; font-size: 12px; font-weight: 500; }"
-                "QPushButton:hover { background-color: rgba(14,165,233,0.45); border-color: #38BDF8; }"
+                "QPushButton:hover { background-color: rgba(45,212,191,0.35); border-color: #5EEAD4; }"
             )
             btn.clicked.connect(lambda _c, u=uname: self._fill_demo(u))
             demo_row.addWidget(btn)
@@ -119,7 +119,7 @@ class LoginDialog(QDialog):
     def _build_form_side(self):
         panel = QWidget()
         panel.setObjectName("loginFormPanel")
-        panel.setStyleSheet("QWidget#loginFormPanel { background-color: #0B0E16; }")
+        panel.setStyleSheet("QWidget#loginFormPanel { background-color: #0F1416; }")
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(46, 36, 46, 34)
         layout.setSpacing(18)

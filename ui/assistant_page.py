@@ -315,8 +315,8 @@ class AssistantPage(QWidget):
         bubble.setWordWrap(True)
         bubble.setTextInteractionFlags(Qt.TextSelectableByMouse)
         bubble.setStyleSheet(
-            "background-color: #0284C7; color: #FFFFFF; font-size: 15px;"
-            "padding: 12px 18px; border-radius: 14px;"
+            "background-color: #2DD4BF; color: #06211B; font-size: 15px; font-weight: 500;"
+            "padding: 12px 18px; border-radius: 16px;"
         )
         rl.addWidget(bubble)
         self._insert_chat_widget(row)

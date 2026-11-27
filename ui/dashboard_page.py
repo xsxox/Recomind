@@ -158,8 +158,8 @@ class DashboardPage(QWidget):
         self.progress_bar.setVisible(False)
         self.progress_bar.setMaximumHeight(4)
         self.progress_bar.setStyleSheet(
-            "QProgressBar { background: #101521; border-radius: 2px; }"
-            "QProgressBar::chunk { background: #0EA5E9; border-radius: 2px; }"
+            "QProgressBar { background: #101518; border-radius: 2px; }"
+            "QProgressBar::chunk { background: #2DD4BF; border-radius: 2px; }"
         )
         root.addWidget(self.progress_bar)
 

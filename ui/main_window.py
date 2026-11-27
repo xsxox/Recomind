@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-主窗口 (v2.1 现代流媒体客户端布局)
-参考 Spotify / Plex / Apple TV+ 桌面端：
-  左侧固定沉浸式分组边栏（品牌 + 分组导航 + 底部用户卡片）
-  右侧全屏无边框流媒体主画布
+主窗口 (v3.0 浮动圆角边栏 + 平滑切页过渡动画)
+==============================================
+参考 MOVIEGO 极简圆润流媒体桌面端：
+  - 外留 14px 边距，左侧为独立大圆角浮动边栏 + 实心药丸导航
+  - 右侧切换页面带有 QPropertyAnimation 淡入过渡动画
 """
-from PyQt5.QtCore import QSize, Qt
-from PyQt5.QtWidgets import (QFrame, QHBoxLayout, QLabel, QMainWindow,
-                             QMessageBox, QPushButton, QStackedWidget,
-                             QVBoxLayout, QWidget)
+from PyQt5.QtCore import QEasingCurve, QPropertyAnimation, QSize, Qt
+from PyQt5.QtWidgets import (QFrame, QGraphicsOpacityEffect, QHBoxLayout,
+                             QLabel, QMainWindow, QMessageBox, QPushButton,
+                             QStackedWidget, QVBoxLayout, QWidget)
 
 import config
 from services.history_service import HistoryService
@@ -47,10 +48,11 @@ class MainWindow(QMainWindow):
         self.want_relogin = False
         self._nav_buttons = []
         self._nav_items = []
+        self._fade_anim = None
 
         self.setWindowTitle(f"{config.APP_NAME} v{config.APP_VERSION}")
-        self.resize(1380, 880)
-        self.setMinimumSize(1120, 720)
+        self.resize(1400, 900)
+        self.setMinimumSize(1140, 740)
         self._build_ui()
 
     def get_user(self):
@@ -70,8 +72,8 @@ class MainWindow(QMainWindow):
     def _build_ui(self):
         central = QWidget()
         root = QHBoxLayout(central)
-        root.setContentsMargins(0, 0, 0, 0)
-        root.setSpacing(0)
+        root.setContentsMargins(14, 14, 14, 14)
+        root.setSpacing(14)
 
         root.addWidget(self._build_sidebar())
 
@@ -104,22 +106,22 @@ class MainWindow(QMainWindow):
     def _build_sidebar(self):
         bar = QFrame()
         bar.setObjectName("sideBar")
-        bar.setFixedWidth(232)
+        bar.setFixedWidth(236)
 
         layout = QVBoxLayout(bar)
-        layout.setContentsMargins(16, 22, 16, 18)
-        layout.setSpacing(6)
+        layout.setContentsMargins(14, 22, 14, 16)
+        layout.setSpacing(5)
 
         # 品牌标识区
         brand_row = QHBoxLayout()
-        brand_row.setContentsMargins(8, 0, 4, 14)
+        brand_row.setContentsMargins(10, 0, 6, 14)
         brand_row.setSpacing(10)
         logo = QLabel("R")
         logo.setFixedSize(32, 32)
         logo.setAlignment(Qt.AlignCenter)
         logo.setStyleSheet(
-            "background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #38BDF8, stop:1 #0284C7);"
-            "color: #FFFFFF; font-size: 16px; font-weight: bold; border-radius: 9px;"
+            "background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #6EE7B7, stop:1 #0EA5E9);"
+            "color: #06211B; font-size: 16px; font-weight: bold; border-radius: 10px;"
         )
         brand = QLabel("RECOMIND")
         brand.setObjectName("brandTitle")
@@ -133,13 +135,13 @@ class MainWindow(QMainWindow):
 
         is_admin = self.user_service.is_admin(self.current_user)
         groups = [
-            ("发现与探索", [
+            ("MENU", [
                 ("sparkles", "个性推荐", 0, False),
                 ("movie", "影片库", 1, False),
                 ("bot", "AI 影伴", 2, False),
             ]),
-            ("数据与实验室", [
-                ("users", "个人画像", 3, False),
+            ("SYSTEM & PROFILE", [
+                ("users", "个人空间", 3, False),
                 ("chart-bar", "算法分析", 6, False),
                 ("settings", "偏好设置", 4, False),
                 ("layers", "后台管理", 5, True),
@@ -180,15 +182,15 @@ class MainWindow(QMainWindow):
         ec_top = QHBoxLayout()
         ec_top.setSpacing(6)
         dot = QLabel("●")
-        dot.setStyleSheet("color: #10B981; font-size: 10px;")
-        ec_title = QLabel("混合推荐引擎在线")
+        dot.setStyleSheet("color: #34D399; font-size: 10px;")
+        ec_title = QLabel("混合引擎就绪")
         ec_title.setStyleSheet("color: #E2E8F0; font-size: 12px; font-weight: bold;")
         ec_top.addWidget(dot)
         ec_top.addWidget(ec_title)
         ec_top.addStretch()
         ec_layout.addLayout(ec_top)
         ec_sub = QLabel("SBERT/LSA · SVD · CF · MMR")
-        ec_sub.setStyleSheet("color: #38BDF8; font-size: 10px; font-weight: 500;")
+        ec_sub.setStyleSheet("color: #5EEAD4; font-size: 10px; font-weight: 500;")
         ec_layout.addWidget(ec_sub)
         layout.addWidget(engine_card)
         layout.addSpacing(8)
@@ -212,14 +214,14 @@ class MainWindow(QMainWindow):
         self.top_name_label = QLabel(display)
         self.top_name_label.setObjectName("userName")
         role_lbl = QLabel("管理员" if is_admin else "影迷会员")
-        role_lbl.setStyleSheet("color: #71717A; font-size: 11px;")
+        role_lbl.setStyleSheet("color: #6B7C85; font-size: 11px;")
         name_col.addWidget(self.top_name_label)
         name_col.addWidget(role_lbl)
         uc_layout.addLayout(name_col, 1)
 
         logout_btn = QPushButton()
         logout_btn.setObjectName("logoutBtn")
-        logout_btn.setIcon(make_icon("logout", "#A1A1AA", 15))
+        logout_btn.setIcon(make_icon("logout", "#94A3B8", 15))
         logout_btn.setIconSize(QSize(15, 15))
         logout_btn.setFixedSize(32, 32)
         logout_btn.setToolTip("退出登录")
@@ -237,12 +239,28 @@ class MainWindow(QMainWindow):
             is_active = (idx == active_index)
             btn.setChecked(is_active)
             icon_name = self._nav_items[idx][0]
-            btn.setIcon(make_icon(icon_name, "#38BDF8" if is_active else "#64748B", 18))
+            btn.setIcon(make_icon(icon_name, "#06211B" if is_active else "#8B9AA2", 18))
 
     def _switch_page(self, nav_index):
         self._update_nav_state(nav_index)
         stack_index = self._nav_items[nav_index][2]
+        if self.stack.currentIndex() == stack_index:
+            return
         self.stack.setCurrentIndex(stack_index)
+        target_widget = self.stack.currentWidget()
+
+        # 页面切换平滑淡入动画
+        effect = QGraphicsOpacityEffect(target_widget)
+        target_widget.setGraphicsEffect(effect)
+        anim = QPropertyAnimation(effect, b"opacity", self)
+        anim.setDuration(220)
+        anim.setStartValue(0.35)
+        anim.setEndValue(1.0)
+        anim.setEasingCurve(QEasingCurve.OutCubic)
+        anim.finished.connect(lambda: target_widget.setGraphicsEffect(None))
+        self._fade_anim = anim
+        anim.start()
+
         if stack_index == 3:
             self.profile_page.refresh()
         elif stack_index == 4:

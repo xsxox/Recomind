@@ -5,12 +5,14 @@
 """
 import math
 
-from PyQt5.QtCore import QPoint, QPointF, QRect, QRectF, QSize, Qt, pyqtSignal
+from PyQt5.QtCore import (QEasingCurve, QPoint, QPointF, QPropertyAnimation,
+                          QRect, QRectF, QSize, Qt, QVariantAnimation,
+                          pyqtProperty, pyqtSignal)
 from PyQt5.QtGui import (QColor, QFont, QIcon, QLinearGradient, QPainter,
                          QPainterPath, QPen, QPixmap, QPolygonF,
                          QRadialGradient)
 from PyQt5.QtWidgets import (QFrame, QGraphicsDropShadowEffect, QLabel,
-                             QLayout, QVBoxLayout, QWidget)
+                             QLayout, QPushButton, QVBoxLayout, QWidget)
 
 
 def apply_shadow(widget, blur=24, y_offset=6, alpha=60):
@@ -291,23 +293,35 @@ class FlowContainer(QWidget):
 
 
 class MoviePoster(QWidget):
-    """2:3 纯净影院级海报（支持悬浮高亮边框、TMDB 评分浮标、推荐契合度浮标）。"""
+    """2:3 纯净影院级海报（支持平滑动画悬浮高亮边框、TMDB 评分浮标、推荐契合度浮标）。"""
 
-    def __init__(self, movie, radius=12, large=False, score=None, parent=None):
+    def __init__(self, movie, radius=14, large=False, score=None, parent=None):
         super().__init__(parent)
         self.movie = movie
         self.radius = radius
         self.large = large
         self.score = score
         self._hovered = False
+        self._hover_t = 0.0
         self._pixmap = None
+        self._anim = QVariantAnimation(self)
+        self._anim.setDuration(200)
+        self._anim.setEasingCurve(QEasingCurve.OutCubic)
+        self._anim.valueChanged.connect(self._on_hover_anim)
         self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         self._load_online()
+
+    def _on_hover_anim(self, val):
+        self._hover_t = float(val)
+        self.update()
 
     def set_hovered(self, hovered):
         if self._hovered != hovered:
             self._hovered = hovered
-            self.update()
+            self._anim.stop()
+            self._anim.setStartValue(self._hover_t)
+            self._anim.setEndValue(1.0 if hovered else 0.0)
+            self._anim.start()
 
     def paintEvent(self, event):
         p = QPainter(self)
@@ -340,9 +354,9 @@ class MoviePoster(QWidget):
             bw = p.fontMetrics().horizontalAdvance(txt) + 14
             b_rect = QRectF(8, 8, bw, 22)
             p.setPen(Qt.NoPen)
-            p.setBrush(QColor(2, 132, 199, 230))
-            p.drawRoundedRect(b_rect, 6, 6)
-            p.setPen(QColor("#FFFFFF"))
+            p.setBrush(QColor(45, 212, 191, 232))
+            p.drawRoundedRect(b_rect, 8, 8)
+            p.setPen(QColor("#06211B"))
             p.drawText(b_rect, Qt.AlignCenter, txt)
 
         # 右上角：TMDB 评分角标
@@ -355,18 +369,20 @@ class MoviePoster(QWidget):
             bw = p.fontMetrics().horizontalAdvance(txt) + 12
             b_rect = QRectF(w - bw - 8, 8, bw, 22)
             p.setPen(Qt.NoPen)
-            p.setBrush(QColor(7, 9, 14, 205))
-            p.drawRoundedRect(b_rect, 6, 6)
+            p.setBrush(QColor(8, 11, 12, 210))
+            p.drawRoundedRect(b_rect, 8, 8)
             p.setPen(QColor("#FBBF24"))
             p.drawText(b_rect, Qt.AlignCenter, txt)
 
-        # 边框（平时极细冷灰玻璃描边，悬停亮起冰川青蓝轮廓光）
+        # 边框（平滑动画过渡：从极细玻璃边过渡到薄荷青轮廓光）
         p.setBrush(Qt.NoBrush)
-        if self._hovered:
-            p.setPen(QPen(QColor("#38BDF8"), 2.5))
+        if self._hover_t > 0.01:
+            alpha = int(28 + 210 * self._hover_t)
+            width = 1.0 + 1.6 * self._hover_t
+            p.setPen(QPen(QColor(94, 234, 212, alpha), width))
             p.drawRoundedRect(rect.adjusted(1.2, 1.2, -1.2, -1.2), self.radius, self.radius)
         else:
-            p.setPen(QPen(QColor(148, 163, 184, 28), 1.0))
+            p.setPen(QPen(QColor(255, 255, 255, 24), 1.0))
             p.drawRoundedRect(rect.adjusted(0.5, 0.5, -0.5, -0.5), self.radius, self.radius)
         p.end()
 
@@ -585,4 +601,405 @@ class StarRating(QWidget):
         p.setFont(font)
         p.setPen(QColor("#FBBF24") if active > 0 else QColor("#64748B"))
         p.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, self.LABELS.get(active, f"{active} 分"))
+        p.end()
+
+
+# ==============================================================================
+# v3.0 新增互动动画与自绘可视化组件 (CoverFlow / Sparkline / SmoothRadar)
+# ==============================================================================
+
+
+class CoverFlowCarousel(QWidget):
+    """
+    3D 层次感 CoverFlow 海报轮播组件（参考 MOVIEGO 设计语言）：
+      - 中心海报最大最亮，两侧海报对称阶梯缩放与暗化层叠
+      - QPropertyAnimation 平滑滑动切页（OutCubic 缓动）
+      - 支持点击两侧海报切换焦点、点击中心海报打开详情、鼠标滚轮切换
+    """
+    selection_changed = pyqtSignal(int)      # 当前中心索引变化
+    movie_activated = pyqtSignal(object)     # 双击或点击中心海报触发打开详情
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._items = []          # [(movie, score, reason), ...]
+        self._pixmaps = {}        # {movie_id: QPixmap}
+        self._current_index = 0
+        self._scroll_pos = 0.0
+        self._hit_rects = []      # [(QRectF, item_index)] 用于点击判定
+
+        self.setMinimumHeight(295)
+        self.setMaximumHeight(320)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setMouseTracking(True)
+
+        self._anim = QPropertyAnimation(self, b"scrollPos", self)
+        self._anim.setDuration(360)
+        self._anim.setEasingCurve(QEasingCurve.OutCubic)
+
+        # 左右悬浮切换按钮
+        btn_style = (
+            "QPushButton { background-color: rgba(16, 21, 24, 210); color: #E2E8F0; "
+            "border: 1px solid rgba(255,255,255,0.14); border-radius: 19px; font-size: 16px; font-weight: bold; padding: 0; }"
+            "QPushButton:hover { background-color: #2DD4BF; color: #06211B; border-color: #5EEAD4; }"
+        )
+        self._prev_btn = QPushButton("‹", self)
+        self._prev_btn.setFixedSize(38, 38)
+        self._prev_btn.setStyleSheet(btn_style)
+        self._prev_btn.setCursor(Qt.PointingHandCursor)
+        self._prev_btn.clicked.connect(lambda: self.step(-1))
+
+        self._next_btn = QPushButton("›", self)
+        self._next_btn.setFixedSize(38, 38)
+        self._next_btn.setStyleSheet(btn_style)
+        self._next_btn.setCursor(Qt.PointingHandCursor)
+        self._next_btn.clicked.connect(lambda: self.step(1))
+
+    @pyqtProperty(float)
+    def scrollPos(self):
+        return self._scroll_pos
+
+    @scrollPos.setter
+    def scrollPos(self, val):
+        self._scroll_pos = float(val)
+        self.update()
+
+    def set_items(self, items):
+        """设置轮播列表 [(movie, score, reason), ...]。"""
+        self._items = list(items or [])
+        self._pixmaps.clear()
+        self._current_index = 0
+        self._scroll_pos = 0.0
+        for item in self._items:
+            movie = item[0]
+            url = getattr(movie, "poster_url", "") or ""
+            if url:
+                try:
+                    from ui.cover_loader import get_loader
+                    get_loader().load(url, lambda pm, mid=movie.id: self._on_pm(mid, pm))
+                except Exception:
+                    pass
+        has_many = len(self._items) > 1
+        self._prev_btn.setVisible(has_many)
+        self._next_btn.setVisible(has_many)
+        self.update()
+        if self._items:
+            self.selection_changed.emit(0)
+
+    def _on_pm(self, mid, pixmap):
+        if pixmap is not None and not pixmap.isNull():
+            self._pixmaps[mid] = pixmap
+            self.update()
+
+    def current_item(self):
+        if 0 <= self._current_index < len(self._items):
+            return self._items[self._current_index]
+        return None
+
+    def step(self, delta):
+        if not self._items:
+            return
+        target = max(0, min(len(self._items) - 1, self._current_index + delta))
+        self.select_index(target)
+
+    def select_index(self, index):
+        if not (0 <= index < len(self._items)):
+            return
+        if index == self._current_index and abs(self._scroll_pos - index) < 0.01:
+            return
+        self._current_index = index
+        self._anim.stop()
+        self._anim.setStartValue(self._scroll_pos)
+        self._anim.setEndValue(float(index))
+        self._anim.start()
+        self.selection_changed.emit(index)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        cy = self.height() // 2 - 19
+        self._prev_btn.move(8, cy)
+        self._next_btn.move(self.width() - 46, cy)
+        self._prev_btn.raise_()
+        self._next_btn.raise_()
+
+    def wheelEvent(self, event):
+        delta = event.angleDelta().y() or event.angleDelta().x()
+        if delta < 0:
+            self.step(1)
+        elif delta > 0:
+            self.step(-1)
+        event.accept()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            pos = event.pos()
+            # 按绘制逆序（最上层优先）命中测试
+            for rect, idx in reversed(self._hit_rects):
+                if rect.contains(pos):
+                    if idx == self._current_index:
+                        self.movie_activated.emit(self._items[idx][0])
+                    else:
+                        self.select_index(idx)
+                    return
+        super().mousePressEvent(event)
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        p.setRenderHint(QPainter.SmoothPixmapTransform)
+
+        w, h = float(self.width()), float(self.height())
+        if not self._items:
+            p.setPen(QColor("#6B7C85"))
+            p.drawText(QRectF(0, 0, w, h), Qt.AlignCenter, "暂无推荐影片")
+            p.end()
+            return
+
+        # 底层柔和冷青光晕
+        glow = QRadialGradient(QPointF(w * 0.5, h * 0.52), w * 0.36)
+        glow.setColorAt(0.0, QColor(45, 212, 191, 34))
+        glow.setColorAt(1.0, QColor(45, 212, 191, 0))
+        p.fillRect(QRectF(0, 0, w, h), glow)
+
+        # 按距离中心由远到近排序绘制，实现 3D 遮挡层次感
+        visible_indices = []
+        for i in range(len(self._items)):
+            offset = i - self._scroll_pos
+            if abs(offset) <= 3.6:
+                visible_indices.append((abs(offset), offset, i))
+        visible_indices.sort(key=lambda x: -x[0])
+
+        base_w, base_h = 188.0, 272.0
+        cx_center = w * 0.5
+        cy_center = h * 0.5
+
+        self._hit_rects = []
+        for dist, offset, idx in visible_indices:
+            scale = max(0.62, 1.0 - 0.115 * dist)
+            cw = base_w * scale
+            ch = base_h * scale
+
+            # 阶梯水平偏移（紧致层叠）
+            sign = 1.0 if offset >= 0 else -1.0
+            dx = sign * (108.0 * min(dist, 1.0) + 84.0 * max(0.0, dist - 1.0))
+            x = cx_center + dx - cw * 0.5
+            y = cy_center - ch * 0.5
+            rect = QRectF(x, y, cw, ch)
+            self._hit_rects.append((rect, idx))
+
+            movie, score, _reason = self._items[idx]
+            radius = 16.0 * scale
+
+            p.save()
+            # 中心海报冷青微投影边框
+            if dist < 0.35:
+                p.setPen(QPen(QColor(94, 234, 212, 190), 2.5))
+                p.setBrush(Qt.NoBrush)
+                p.drawRoundedRect(rect.adjusted(-1.5, -1.5, 1.5, 1.5), radius + 1.5, radius + 1.5)
+
+            clip = QPainterPath()
+            clip.addRoundedRect(rect, radius, radius)
+            p.setClipPath(clip)
+
+            pm = self._pixmaps.get(movie.id)
+            if pm is not None and not pm.isNull():
+                pw, ph = float(pm.width()), float(pm.height())
+                tr, sr = cw / ch, pw / ph
+                if sr > tr:
+                    nw = ph * tr
+                    src = QRectF((pw - nw) / 2.0, 0, nw, ph)
+                else:
+                    nh = pw / tr
+                    src = QRectF(0, (ph - nh) / 2.0, pw, nh)
+                p.drawPixmap(rect, pm, src)
+            else:
+                top_c, bot_c = harmonize_color(getattr(movie, "poster_color", None))
+                grad = QLinearGradient(0, y, 0, y + ch)
+                grad.setColorAt(0.0, top_c)
+                grad.setColorAt(1.0, bot_c)
+                p.fillRect(rect, grad)
+                f = QFont("Microsoft YaHei UI", max(9, int(12 * scale)))
+                f.setBold(True)
+                p.setFont(f)
+                p.setPen(QColor("#FFFFFF"))
+                p.drawText(rect.adjusted(10, 10, -10, -10), Qt.AlignCenter | Qt.TextWordWrap, movie.title)
+
+            # 两侧海报渐暗遮罩，突出 C 位主角
+            if dist > 0.1:
+                dim_alpha = min(155, int(48 * dist))
+                p.fillRect(rect, QColor(8, 11, 12, dim_alpha))
+
+            # 中心海报底部微渐暗 + 契合度小胶囊
+            if dist < 0.4 and score:
+                txt = f"{int(round(min(1.0, score) * 100))}% 匹配"
+                f = QFont("Microsoft YaHei UI", 9)
+                f.setBold(True)
+                p.setFont(f)
+                bw = p.fontMetrics().horizontalAdvance(txt) + 16
+                b_rect = QRectF(x + 10, y + 10, bw, 24)
+                p.setPen(Qt.NoPen)
+                p.setBrush(QColor(45, 212, 191, 235))
+                p.drawRoundedRect(b_rect, 9, 9)
+                p.setPen(QColor("#06211B"))
+                p.drawText(b_rect, Qt.AlignCenter, txt)
+
+            p.restore()
+            if dist >= 0.35:
+                p.setPen(QPen(QColor(255, 255, 255, 32), 1.0))
+                p.setBrush(Qt.NoBrush)
+                p.drawRoundedRect(rect, radius, radius)
+
+        p.end()
+
+
+class SparklineChart(QWidget):
+    """参考图右下角同款：平滑贝塞尔曲线趋势图 + 冷青渐变填充。"""
+
+    def __init__(self, values=None, labels=None, color="#2DD4BF", parent=None):
+        super().__init__(parent)
+        self._values = values or [0.62, 0.71, 0.68, 0.80, 0.77, 0.91, 0.89]
+        self._labels = labels or ["内容", "协同", "SVD", "语义", "口碑", "情感", "综合"]
+        self._color = QColor(color)
+        self.setMinimumHeight(106)
+
+    def set_data(self, values, labels=None):
+        if values:
+            self._values = [max(0.05, min(1.0, float(v))) for v in values]
+        if labels:
+            self._labels = labels
+        self.update()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        w, h = float(self.width()), float(self.height())
+        pad_l, pad_r, pad_t, pad_b = 12.0, 12.0, 14.0, 24.0
+        cw = max(10.0, w - pad_l - pad_r)
+        ch = max(10.0, h - pad_t - pad_b)
+
+        # 淡淡的水平辅助网格线
+        p.setPen(QPen(QColor(255, 255, 255, 16), 1.0, Qt.DashLine))
+        for ratio in (0.25, 0.6, 0.95):
+            gy = pad_t + ch * (1.0 - ratio)
+            p.drawLine(QPointF(pad_l, gy), QPointF(w - pad_r, gy))
+
+        n = len(self._values)
+        if n < 2:
+            p.end()
+            return
+
+        pts = []
+        for i, v in enumerate(self._values):
+            px = pad_l + (cw * i / (n - 1))
+            py = pad_t + ch * (1.0 - v)
+            pts.append(QPointF(px, py))
+
+        # 三次贝塞尔平滑曲线
+        line_path = QPainterPath(pts[0])
+        for i in range(n - 1):
+            mid_x = (pts[i].x() + pts[i + 1].x()) * 0.5
+            line_path.cubicTo(QPointF(mid_x, pts[i].y()), QPointF(mid_x, pts[i + 1].y()), pts[i + 1])
+
+        fill_path = QPainterPath(line_path)
+        fill_path.lineTo(pts[-1].x(), pad_t + ch)
+        fill_path.lineTo(pts[0].x(), pad_t + ch)
+        fill_path.closeSubpath()
+
+        grad = QLinearGradient(0, pad_t, 0, pad_t + ch)
+        c_top = QColor(self._color.red(), self._color.green(), self._color.blue(), 85)
+        c_bot = QColor(self._color.red(), self._color.green(), self._color.blue(), 0)
+        grad.setColorAt(0.0, c_top)
+        grad.setColorAt(1.0, c_bot)
+        p.fillPath(fill_path, grad)
+
+        p.setPen(QPen(self._color, 2.4, Qt.SolidLine, Qt.RoundCap))
+        p.setBrush(Qt.NoBrush)
+        p.drawPath(line_path)
+
+        # 末位高亮呼吸点
+        last = pts[-1]
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(self._color.red(), self._color.green(), self._color.blue(), 70))
+        p.drawEllipse(last, 7, 7)
+        p.setBrush(QColor("#F8FAFC"))
+        p.drawEllipse(last, 3.2, 3.2)
+
+        # 底部标签
+        f = QFont("Microsoft YaHei UI", 8)
+        p.setFont(f)
+        p.setPen(QColor("#6B7C85"))
+        for i, lbl in enumerate(self._labels[:n]):
+            lx = pad_l + (cw * i / (n - 1)) - 16
+            p.drawText(QRectF(lx, h - 20, 32, 16), Qt.AlignCenter, lbl)
+        p.end()
+
+
+class SmoothRadarChart(QWidget):
+    """自绘冷青发光多边形雷达图（替代 Matplotlib 静态框，圆润无锯齿）。"""
+
+    def __init__(self, items=None, parent=None):
+        super().__init__(parent)
+        self._items = items or []   # [(label, norm_0_to_1, raw_score)]
+        self.setMinimumSize(260, 240)
+
+    def set_data(self, items):
+        self._items = list(items or [])
+        self.update()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        w, h = float(self.width()), float(self.height())
+        if len(self._items) < 3:
+            p.setPen(QColor("#6B7C85"))
+            p.drawText(QRectF(0, 0, w, h), Qt.AlignCenter, "评分满 3 个类型后解锁品味雷达")
+            p.end()
+            return
+
+        cx, cy = w * 0.5, h * 0.52
+        radius = min(w, h) * 0.33
+        n = len(self._items)
+
+        # 同心蜘蛛网
+        for ring in (0.25, 0.5, 0.75, 1.0):
+            poly = QPolygonF()
+            for i in range(n):
+                ang = -math.pi / 2 + 2 * math.pi * i / n
+                poly.append(QPointF(cx + radius * ring * math.cos(ang), cy + radius * ring * math.sin(ang)))
+            p.setPen(QPen(QColor(255, 255, 255, 24 if ring == 1.0 else 14), 1.0))
+            p.setBrush(Qt.NoBrush)
+            p.drawPolygon(poly)
+
+        # 放射轴线 + 标签
+        f = QFont("Microsoft YaHei UI", 9)
+        f.setBold(True)
+        p.setFont(f)
+        data_poly = QPolygonF()
+        pts = []
+        for i, (label, val, raw) in enumerate(self._items):
+            ang = -math.pi / 2 + 2 * math.pi * i / n
+            ax_end = QPointF(cx + radius * math.cos(ang), cy + radius * math.sin(ang))
+            p.setPen(QPen(QColor(255, 255, 255, 18), 1.0))
+            p.drawLine(QPointF(cx, cy), ax_end)
+
+            pt = QPointF(cx + radius * val * math.cos(ang), cy + radius * val * math.sin(ang))
+            pts.append(pt)
+            data_poly.append(pt)
+
+            lx = cx + (radius + 24) * math.cos(ang)
+            ly = cy + (radius + 18) * math.sin(ang)
+            p.setPen(QColor("#CBD5E1"))
+            p.drawText(QRectF(lx - 34, ly - 10, 68, 20), Qt.AlignCenter, label)
+
+        # 填充半透明冷青多边形
+        p.setPen(QPen(QColor("#5EEAD4"), 2.2))
+        p.setBrush(QColor(45, 212, 191, 58))
+        p.drawPolygon(data_poly)
+
+        # 顶点微光节点
+        p.setPen(Qt.NoPen)
+        for pt in pts:
+            p.setBrush(QColor(94, 234, 212, 90))
+            p.drawEllipse(pt, 5.5, 5.5)
+            p.setBrush(QColor("#FFFFFF"))
+            p.drawEllipse(pt, 2.5, 2.5)
         p.end()
